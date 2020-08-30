@@ -3,7 +3,7 @@ module Server
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Saturn
-
+open System
 open Shared
 
 type Storage () =
@@ -19,7 +19,6 @@ type Storage () =
         else Error "Invalid todo"
 
 let storage = Storage()
-
 storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
 storage.AddTodo(Todo.create "Write your app") |> ignore
 storage.AddTodo(Todo.create "Ship it !!!") |> ignore

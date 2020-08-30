@@ -8,7 +8,7 @@ type Todo =
 
 type AccountingPeriod =
     { Month : uint8
-      Year : uint8 }
+      Year : uint16 }
     
 type Invoice =
     { ManDays : uint8

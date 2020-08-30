@@ -4,44 +4,47 @@ open Elmish
 open Fable.Remoting.Client
 open Shared
 
+
+
 type Model =
-    { Todos: Todo list
-      Input: string }
+    { Input: Invoice }
 
 
-type Msg =
-    | GotTodos of Todo list
-    | SetInput of string
-    | AddTodo
-    | AddedTodo of Todo
+type Msg =    
     | AddInvoice
+    | AddedInvoice of Invoice
+    | SetInput of Invoice
 
 let todosApi =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<ITodosApi>
 
-let init(): Model * Cmd<Msg> =
+let invoiceApi =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<IInvoiceApi>
+
+let init(): Model * Cmd<Msg> =    
     let model =
-        { Todos = []
-          Input = "" }
-    let cmd = Cmd.OfAsync.perform todosApi.getTodos () GotTodos
+        { Input = { Rate = uint16 6000
+                    ManDays = 20uy
+                    Month = { Month = 1uy
+                              Year = uint16 2020 }
+                  }
+        }
+    let cmd = Cmd.none//Cmd.OfAsync.perform todosApi.getTodos () GotTodos
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
-    match msg with
-    | GotTodos todos ->
-        { model with Todos = todos }, Cmd.none
-    | SetInput value ->
-        { model with Input = value }, Cmd.none
-    | AddTodo ->
-        let todo = Todo.create model.Input
-        let cmd = Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
-        { model with Input = "" }, cmd
-    | AddedTodo todo ->
-        { model with Todos = model.Todos @ [ todo ] }, Cmd.none
+    match msg with   
+    | AddedInvoice invoice ->
+        model, Cmd.none
     | AddInvoice ->
-        {Rate = }
+        let cmd = Cmd.OfAsync.perform invoiceApi.addInvoice model.Input AddedInvoice
+        model ,cmd
+    | SetInput invoice ->
+        {model with Input = invoice} ,Cmd.none
 
 open Fable.React
 open Fable.React.Props
@@ -62,24 +65,58 @@ let navBrand =
 
 let containerBox (model : Model) (dispatch : Msg -> unit) =
     Box.box' [ ] [
-        Content.content [ ] [
-            Content.Ol.ol [ ] [
-                for todo in model.Todos ->
-                    li [ ] [ str todo.Description ]
-            ]
-        ]
-        Field.div [ Field.IsGrouped ] [
+        //Content.content [ ] [
+        //    Content.Ol.ol [ ] [
+        //        for todo in model.Todos ->
+        //            li [ ] [ str todo.Description ]
+        //    ]
+        //]
+        Field.div [ Field.IsGrouped ] [            
             Control.p [ Control.IsExpanded ] [
+                Label.label [ ] [ str "Man-day rate" ]
                 Input.text [
-                  Input.Value model.Input
-                  Input.Placeholder "What needs to be done?"
-                  Input.OnChange (fun x -> SetInput x.Value |> dispatch) ]
-            ]
+                  Input.Value (model.Input.Rate.ToString())
+                  Input.Placeholder "Man-day rate in CZK"
+                  Input.OnChange (fun x -> SetInput {model.Input with Rate = uint16 x.Value } |> dispatch)
+                ]
+            ]           
+        ]
+        Field.div [ Field.IsGrouped ] [           
+            Control.p [ Control.IsExpanded ] [
+                Label.label [ ] [ str "Month of year" ]
+                Input.text [
+                  Input.Value (model.Input.Month.Month.ToString())
+                  Input.Placeholder "Month of year"
+                  Input.OnChange (fun x -> SetInput {model.Input with Month = { model.Input.Month with Year = uint16 x.Value  } } |> dispatch)
+                ]
+            ]            
+        ]
+        Field.div [ Field.IsGrouped ] [           
+            Control.p [ Control.IsExpanded ] [
+                Label.label [ ] [ str "Year" ]
+                Input.text [
+                  Input.Value (model.Input.Month.Year.ToString())
+                  Input.Placeholder "Year"
+                  Input.OnChange (fun x -> SetInput {model.Input with Month = { model.Input.Month with Year = uint16 x.Value  } } |> dispatch)
+                ]
+            ]            
+        ]
+        Field.div [ Field.IsGrouped ] [           
+            Control.p [ Control.IsExpanded ] [
+                Label.label [ ] [ str "Total number of man days" ]
+                Input.text [
+                  Input.Value (model.Input.ManDays.ToString())
+                  Input.Placeholder "Total number of man days"
+                  Input.OnChange (fun x -> SetInput {model.Input with ManDays = uint8 x.Value } |> dispatch)
+                ]
+            ]            
+        ]
+        Field.div [ Field.IsGrouped ] [           
             Control.p [ ] [
                 Button.a [
                     Button.Color IsPrimary
-                    Button.Disabled (Todo.isValid model.Input |> not)
-                    Button.OnClick (fun _ -> dispatch AddTodo)
+                    //Button.Disabled (Todo.isValid model.Input |> not)
+                    Button.OnClick (fun _ -> dispatch AddInvoice)
                 ] [
                     str "Add"
                 ]
@@ -110,7 +147,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
                     Column.Width (Screen.All, Column.Is6)
                     Column.Offset (Screen.All, Column.Is3)
                 ] [
-                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "Api" ]
+                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "Submit invoice data" ]
                     containerBox model dispatch
                 ]
             ]
