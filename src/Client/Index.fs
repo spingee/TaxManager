@@ -3,17 +3,19 @@ module Index
 open Elmish
 open Fable.Remoting.Client
 open Shared
-
+open System
 
 
 type Model =
-    { Input: Invoice }
+    { Input: Invoice
+      Title: string
+    }
 
 
 type Msg =    
     | AddInvoice
     | AddedInvoice of Invoice
-    | SetInput of Invoice
+    | SetInput of Invoice   
 
 let todosApi =
     Remoting.createApi()
@@ -29,9 +31,10 @@ let init(): Model * Cmd<Msg> =
     let model =
         { Input = { Rate = uint16 6000
                     ManDays = 20uy
-                    Month = { Month = 1uy
-                              Year = uint16 2020 }
+                    Month = { Month = uint8 DateTime.Now.Month
+                              Year = uint16 DateTime.Now.Year }
                   }
+          Title = "Čus"
         }
     let cmd = Cmd.none//Cmd.OfAsync.perform todosApi.getTodos () GotTodos
     model, cmd
@@ -39,16 +42,17 @@ let init(): Model * Cmd<Msg> =
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with   
     | AddedInvoice invoice ->
-        model, Cmd.none
+        {model with Input = invoice}, Cmd.none
     | AddInvoice ->
         let cmd = Cmd.OfAsync.perform invoiceApi.addInvoice model.Input AddedInvoice
         model ,cmd
     | SetInput invoice ->
-        {model with Input = invoice} ,Cmd.none
+        {model with Input = invoice ; Title = sprintf "%s%i" model.Title invoice.Month.Month} ,Cmd.none
 
 open Fable.React
 open Fable.React.Props
 open Fulma
+
 
 let navBrand =
     Navbar.Brand.div [ ] [
@@ -62,6 +66,8 @@ let navBrand =
             ]
         ]
     ]
+
+
 
 let containerBox (model : Model) (dispatch : Msg -> unit) =
     Box.box' [ ] [
@@ -83,24 +89,27 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
         ]
         Field.div [ Field.IsGrouped ] [           
             Control.p [ Control.IsExpanded ] [
-                Label.label [ ] [ str "Month of year" ]
-                Input.text [
-                  Input.Value (model.Input.Month.Month.ToString())
-                  Input.Placeholder "Month of year"
-                  Input.OnChange (fun x -> SetInput {model.Input with Month = { model.Input.Month with Year = uint16 x.Value  } } |> dispatch)
-                ]
-            ]            
-        ]
-        Field.div [ Field.IsGrouped ] [           
+                Label.label [ ] [ str "Month of year" ]               
+                Select.select [
+                        Select.Props [OnChange (fun x ->                            
+                            SetInput {model.Input with Month = { model.Input.Month with Month = uint8 x.Value  } }   |> dispatch)]
+                ] [ select [ DefaultValue System.DateTime.Now.Month ]
+                     [ for m in 1..12 do
+                        yield option [ Value m] [ str <| string m]
+                     
+                     ] ] 
+               
+            ]
             Control.p [ Control.IsExpanded ] [
                 Label.label [ ] [ str "Year" ]
-                Input.text [
+                Input.text [                  
                   Input.Value (model.Input.Month.Year.ToString())
                   Input.Placeholder "Year"
                   Input.OnChange (fun x -> SetInput {model.Input with Month = { model.Input.Month with Year = uint16 x.Value  } } |> dispatch)
                 ]
-            ]            
+            ]                                    
         ]
+       
         Field.div [ Field.IsGrouped ] [           
             Control.p [ Control.IsExpanded ] [
                 Label.label [ ] [ str "Total number of man days" ]
@@ -147,7 +156,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
                     Column.Width (Screen.All, Column.Is6)
                     Column.Offset (Screen.All, Column.Is3)
                 ] [
-                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "Submit invoice data" ]
+                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str <| sprintf "Submit invoice data %s" model.Title ]
                     containerBox model dispatch
                 ]
             ]
