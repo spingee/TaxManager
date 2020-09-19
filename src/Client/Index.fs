@@ -4,6 +4,7 @@ open Elmish
 open Fable.Remoting.Client
 open Shared
 open System
+open Fable.DateFunctions
 
 
 type Model =
@@ -12,10 +13,10 @@ type Model =
     }
 
 
-type Msg =    
+type Msg =
     | AddInvoice
     | AddedInvoice of Invoice
-    | SetInput of Invoice   
+    | SetInput of Invoice
 
 let todosApi =
     Remoting.createApi()
@@ -27,20 +28,20 @@ let invoiceApi =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IInvoiceApi>
 
-let init(): Model * Cmd<Msg> =    
+let init(): Model * Cmd<Msg> =
     let model =
         { Input = { Rate = uint16 6000
                     ManDays = 20uy
                     Month = { Month = uint8 DateTime.Now.Month
                               Year = uint16 DateTime.Now.Year }
                   }
-          Title = "Čus"
+          Title = DateTime.Now.Format("Do MMMM yyyy", DateTime.Locales.Czech)
         }
     let cmd = Cmd.none//Cmd.OfAsync.perform todosApi.getTodos () GotTodos
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
-    match msg with   
+    match msg with
     | AddedInvoice invoice ->
         {model with Input = invoice}, Cmd.none
     | AddInvoice ->
@@ -77,7 +78,7 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
         //            li [ ] [ str todo.Description ]
         //    ]
         //]
-        Field.div [ Field.IsGrouped ] [            
+        Field.div [ Field.IsGrouped ] [
             Control.p [ Control.IsExpanded ] [
                 Label.label [ ] [ str "Man-day rate" ]
                 Input.text [
@@ -85,32 +86,32 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
                   Input.Placeholder "Man-day rate in CZK"
                   Input.OnChange (fun x -> SetInput {model.Input with Rate = uint16 x.Value } |> dispatch)
                 ]
-            ]           
+            ]
         ]
-        Field.div [ Field.IsGrouped ] [           
+        Field.div [ Field.IsGrouped ] [
             Control.p [ Control.IsExpanded ] [
-                Label.label [ ] [ str "Month of year" ]               
+                Label.label [ ] [ str "Month of year" ]
                 Select.select [
-                        Select.Props [OnChange (fun x ->                            
+                        Select.Props [OnChange (fun x ->
                             SetInput {model.Input with Month = { model.Input.Month with Month = uint8 x.Value  } }   |> dispatch)]
                 ] [ select [ DefaultValue System.DateTime.Now.Month ]
                      [ for m in 1..12 do
-                        yield option [ Value m] [ str <| string m]
-                     
-                     ] ] 
-               
+                        let dm = (new DateTime(2020,m,1)).Format("LLLL", DateTime.Locales.Czech)
+                        yield option [ Value m] [ str dm]
+                     ] ]
+
             ]
             Control.p [ Control.IsExpanded ] [
                 Label.label [ ] [ str "Year" ]
-                Input.text [                  
+                Input.text [
                   Input.Value (model.Input.Month.Year.ToString())
                   Input.Placeholder "Year"
                   Input.OnChange (fun x -> SetInput {model.Input with Month = { model.Input.Month with Year = uint16 x.Value  } } |> dispatch)
                 ]
-            ]                                    
+            ]
         ]
-       
-        Field.div [ Field.IsGrouped ] [           
+
+        Field.div [ Field.IsGrouped ] [
             Control.p [ Control.IsExpanded ] [
                 Label.label [ ] [ str "Total number of man days" ]
                 Input.text [
@@ -118,9 +119,9 @@ let containerBox (model : Model) (dispatch : Msg -> unit) =
                   Input.Placeholder "Total number of man days"
                   Input.OnChange (fun x -> SetInput {model.Input with ManDays = uint8 x.Value } |> dispatch)
                 ]
-            ]            
+            ]
         ]
-        Field.div [ Field.IsGrouped ] [           
+        Field.div [ Field.IsGrouped ] [
             Control.p [ ] [
                 Button.a [
                     Button.Color IsPrimary
