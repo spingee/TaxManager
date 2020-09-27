@@ -2,11 +2,19 @@ module App
 
 open Elmish
 open Elmish.React
+open Fable.Core.JsInterop
+open Fable.React
+
+importAll "flatpickr/dist/themes/dark.css"
+importAll "flatpickr/dist/plugins/monthSelect/style.css"
+
 
 #if DEBUG
 open Elmish.Debug
 open Elmish.HMR
 #endif
+
+
 
 Program.mkProgram Index.init Index.update Index.view
 #if DEBUG

@@ -9,11 +9,11 @@ type Todo =
 type AccountingPeriod =
     { Month : uint8
       Year : uint16 }
-    
+
 type Invoice =
     { ManDays : uint8
       Rate: uint16
-      Month: AccountingPeriod }
+      AccountingPeriod: AccountingPeriod }
 
 module Todo =
     let isValid (description: string) =

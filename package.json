@@ -33,6 +33,7 @@
     },
     "dependencies": {
         "bulma": "^0.7.2",
-        "date-fns": "^2.14.0"
+        "flatpickr": "^4.6.6",
+        "react-flatpickr": "^3.10.6"
     }
 }
