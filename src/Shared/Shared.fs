@@ -32,4 +32,4 @@ type ITodosApi =
       addTodo : Todo -> Async<Todo> }
 
 type IInvoiceApi =
-    { addInvoice : Invoice -> Async<Invoice> }
+    { addInvoice : Invoice -> Async<Result<string,string>> }

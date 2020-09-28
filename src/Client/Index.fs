@@ -6,12 +6,15 @@ open Shared
 open System
 
 
-type Model = { Input: Invoice; Title: string }
+type Model =
+    { Input: Invoice
+      Title: string
+      Result: Result<string, string> option }
 
 
 type Msg =
     | AddInvoice
-    | AddedInvoice of Invoice
+    | AddedInvoice of Result<string, string>
     | SetInput of Invoice
 
 let todosApi =
@@ -32,14 +35,15 @@ let init (): Model * Cmd<Msg> =
                 AccountingPeriod =
                     { Month = uint8 DateTime.Now.Month
                       Year = uint16 DateTime.Now.Year } }
-          Title = "Submit invoice data" }
+          Title = "Submit invoice data"
+          Result = None }
 
     let cmd = Cmd.none //Cmd.OfAsync.perform todosApi.getTodos () GotTodos
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
-    | AddedInvoice invoice -> { model with Input = invoice }, Cmd.none
+    | AddedInvoice result -> { model with Result = Some result }, Cmd.none
     | AddInvoice ->
         let cmd =
             Cmd.OfAsync.perform invoiceApi.addInvoice model.Input AddedInvoice
@@ -126,7 +130,9 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                                  SetInput
                                      { model.Input with
                                            ManDays = uint8 x.Value }
-                                 |> dispatch) ]
+                                 |> dispatch)
+
+                              ]
             ]
         ]
         Field.div [ Field.IsGrouped ] [
@@ -159,7 +165,16 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         str <| model.Title
                     ]
                     containerBox model dispatch
+                    match model.Result with
+                    | Some res ->
+                        Notification.notification
+                            [Notification.Color (match res with |Ok _ -> IsSuccess|Error _ -> IsDanger)]
+                            [str (match res with |Ok s|Error s -> s)]
+                    | None _ -> ()
                 ]
+
+
+
             ]
         ]
     ]
