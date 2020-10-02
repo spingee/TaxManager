@@ -4,18 +4,17 @@ open Elmish
 open Fable.Remoting.Client
 open Shared
 open System
+open Types
 
 
-type Model =
-    { Input: Invoice
-      Title: string
-      Result: Result<string, string> option }
 
 
 type Msg =
     | AddInvoice
     | AddedInvoice of Result<string, string>
-    | SetInput of Invoice
+    | SetRate of string
+    | SetAccPeriod of DateTime
+    | SetMandays of string
 
 let todosApi =
     Remoting.createApi ()
@@ -30,11 +29,10 @@ let invoiceApi =
 let init (): Model * Cmd<Msg> =
     let model =
         { Input =
-              { Rate = uint16 6000
-                ManDays = 20uy
-                AccountingPeriod =
-                    { Month = uint8 DateTime.Now.Month
-                      Year = uint16 DateTime.Now.Year } }
+              { Rate = Validated.success "6000" <| uint16 6000
+                ManDays = Validated.success "20" 20uy
+                AccountingPeriod = DateTime.Now.AddMonths(-1)
+              }
           Title = "Submit invoice data"
           Result = None }
 
@@ -45,11 +43,31 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | AddedInvoice result -> { model with Result = Some result }, Cmd.none
     | AddInvoice ->
+        let invoice :Shared.Invoice = {
+            Rate = model.Input.Rate.Parsed.Value
+            ManDays = model.Input.ManDays.Parsed.Value
+            AccountingPeriod =
+            { Month = uint8 model.Input.AccountingPeriod.Month
+              Year = uint16 model.Input.AccountingPeriod.Year }
+        }
         let cmd =
-            Cmd.OfAsync.perform invoiceApi.addInvoice model.Input AddedInvoice
+            Cmd.OfAsync.perform invoiceApi.addInvoice invoice AddedInvoice
 
         model, cmd
-    | SetInput invoice -> { model with Input = invoice }, Cmd.none
+    | SetRate v ->
+        let rate =
+            match UInt16.TryParse v with
+            | true,parsed -> Validated.success v parsed
+            | false, _ -> Validated.failure v
+        {model with Input = {model.Input with Rate = rate }}  , Cmd.none
+    | SetAccPeriod v ->
+        {model with Input = {model.Input with AccountingPeriod = v }}  , Cmd.none
+    | SetMandays v ->
+        let md =
+            match Byte.TryParse v with
+            | true,parsed -> Validated.success v parsed
+            | false, _ -> Validated.failure v
+        {model with Input = {model.Input with ManDays = md }}  , Cmd.none
 
 open Fable.React
 open Fable.React.Props
@@ -80,26 +98,15 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
         Field.div [ Field.IsGrouped ] [
             Control.p [ Control.IsExpanded ] [
                 Label.label [] [ str "Man-day rate" ]
-                Input.text [ Input.Value(model.Input.Rate.ToString())
+                Input.text [ Input.Value(model.Input.Rate.Raw)
                              Input.Placeholder "Man-day rate in CZK"
-                             Input.OnChange(fun x ->
-                                 SetInput
-                                     { model.Input with
-                                           Rate = uint16 x.Value }
-                                 |> dispatch) ]
+                             Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
             ]
         ]
         Field.div [ Field.IsGrouped ] [
             Control.p [ Control.IsExpanded ] [
                 Label.label [] [ str "Month of year" ]
-                Flatpickr.flatpickr [ Flatpickr.OnChange(fun x ->
-                                          SetInput
-                                              { model.Input with
-                                                    AccountingPeriod =
-                                                        { model.Input.AccountingPeriod with
-                                                              Month = uint8 x.Month
-                                                              Year = uint16 x.Year } }
-                                          |> dispatch)
+                Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
                                       Flatpickr.Value
                                           (System.DateTime
                                               (int model.Input.AccountingPeriod.Year,
@@ -124,13 +131,9 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                 Label.label [] [
                     str "Total number of man days"
                 ]
-                Input.text [ Input.Value(model.Input.ManDays.ToString())
+                Input.text [ Input.Value(model.Input.ManDays.Raw)
                              Input.Placeholder "Total number of man days"
-                             Input.OnChange(fun x ->
-                                 SetInput
-                                     { model.Input with
-                                           ManDays = uint8 x.Value }
-                                 |> dispatch)
+                             Input.OnChange(fun x -> SetMandays x.Value |> dispatch)
 
                               ]
             ]
@@ -138,7 +141,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
         Field.div [ Field.IsGrouped ] [
             Control.p [] [
                 Button.a [ Button.Color IsPrimary
-                           //Button.Disabled (Todo.isValid model.Input |> not)
+                           Button.Disabled (isValid model.Input |> not)
                            Button.OnClick(fun _ -> dispatch AddInvoice) ] [
                     str "Add"
                 ]
@@ -159,22 +162,26 @@ let view (model: Model) (dispatch: Msg -> unit) =
 
         Hero.body [] [
             Container.container [] [
-                Column.column [ Column.Width(Screen.All, Column.Is4)
-                                Column.Offset(Screen.All, Column.Is4) ] [
-                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment(Screen.All, TextAlignment.Centered) ] ] [
-                        str <| model.Title
+                Columns.columns [ Columns.IsCentered ] [
+                    Column.column [ Column.Width(Screen.All, Column.IsOneThird) ] [
+                        Heading.p [ Heading.Modifiers [ Modifier.TextAlignment(Screen.All, TextAlignment.Centered) ] ] [
+                            str <| model.Title
+                        ]
+                        containerBox model dispatch
+                        match model.Result with
+                        | Some res ->
+                            Notification.notification [ Notification.Color
+                                                            (match res with
+                                                             | Ok _ -> IsSuccess
+                                                             | Error _ -> IsDanger) ] [
+                                str
+                                    (match res with
+                                     | Ok s
+                                     | Error s -> s)
+                            ]
+                        | None _ -> ()
                     ]
-                    containerBox model dispatch
-                    match model.Result with
-                    | Some res ->
-                        Notification.notification
-                            [Notification.Color (match res with |Ok _ -> IsSuccess|Error _ -> IsDanger)]
-                            [str (match res with |Ok s|Error s -> s)]
-                    | None _ -> ()
                 ]
-
-
-
             ]
         ]
     ]

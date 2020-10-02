@@ -45,7 +45,7 @@ let invoiceApi =
           fun invoice ->
               async {
                   try
-                    let outputFile = sprintf "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%i-01.xlsx" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month
+                    let outputFile = sprintf "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01.xlsx" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month
                     createExcelInvoice outputFile invoice
                     return Ok "Success"
                   with ex ->

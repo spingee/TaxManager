@@ -29,4 +29,3 @@ let createExcelInvoice (destFile:string) invoice =
     ws.Cell(26,"D").Value <- sprintf "%.0f,-Kč" tax
     ws.Cell(27,"D").Value <- sprintf "%.0f,-Kč" total
     wb.SaveAs(destFile)
-    wb.SaveAs(destFile,new Save)
