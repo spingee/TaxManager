@@ -8,11 +8,14 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="InvoiceTemplate.xlsx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Compile Include="InvoiceExcel.fs" />
     <None Include="paket.references" />
     <Compile Include="Server.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="GemBox.Spreadsheet" Version="47.0.1000" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

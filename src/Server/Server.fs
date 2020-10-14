@@ -6,6 +6,7 @@ open Saturn
 open System
 open Shared
 open InvoiceExcel
+open GemBox.Spreadsheet
 
 type Storage() =
     let todos = ResizeArray<_>()
@@ -46,7 +47,7 @@ let invoiceApi =
               async {
                   try
                     let outputFile = sprintf "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01.xlsx" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month
-                    createExcelInvoice outputFile invoice
+                    createExcelAndPdfInvoice outputFile invoice
                     return Ok "Success"
                   with ex ->
                     return Error <| sprintf "%s" ex.Message
@@ -68,5 +69,5 @@ let app =
         use_static "public"
         use_gzip
     }
-
+SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
 run app
