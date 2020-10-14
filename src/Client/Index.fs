@@ -15,6 +15,7 @@ type Msg =
     | SetRate of string
     | SetAccPeriod of DateTime
     | SetMandays of string
+    | HandleError of Exception
 
 let todosApi =
     Remoting.createApi ()
@@ -31,43 +32,64 @@ let init (): Model * Cmd<Msg> =
         { Input =
               { Rate = Validated.success "6000" <| uint16 6000
                 ManDays = Validated.success "20" 20uy
-                AccountingPeriod = DateTime.Now.AddMonths(-1)
-              }
+                AccountingPeriod = DateTime.Now.AddMonths(-1) }
           Title = "Submit invoice data"
-          Result = None }
+          Result = None
+          IsLoading = false }
 
     let cmd = Cmd.none //Cmd.OfAsync.perform todosApi.getTodos () GotTodos
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
-    | AddedInvoice result -> { model with Result = Some result }, Cmd.none
+    | AddedInvoice result ->
+        { model with
+              Result = Some result
+              IsLoading = false },
+        Cmd.none
     | AddInvoice ->
-        let invoice :Shared.Invoice = {
-            Rate = model.Input.Rate.Parsed.Value
-            ManDays = model.Input.ManDays.Parsed.Value
-            AccountingPeriod =
-            { Month = uint8 model.Input.AccountingPeriod.Month
-              Year = uint16 model.Input.AccountingPeriod.Year }
-        }
+        let invoice: Shared.Invoice =
+            { Rate = model.Input.Rate.Parsed.Value
+              ManDays = model.Input.ManDays.Parsed.Value
+              AccountingPeriod =
+                  { Month = uint8 model.Input.AccountingPeriod.Month
+                    Year = uint16 model.Input.AccountingPeriod.Year } }
+
+        let model = { model with IsLoading = true }
+
         let cmd =
-            Cmd.OfAsync.perform invoiceApi.addInvoice invoice AddedInvoice
+            Cmd.OfAsync.either invoiceApi.addInvoice invoice AddedInvoice HandleError
 
         model, cmd
     | SetRate v ->
         let rate =
             match UInt16.TryParse v with
-            | true,parsed -> Validated.success v parsed
+            | true, parsed -> Validated.success v parsed
             | false, _ -> Validated.failure v
-        {model with Input = {model.Input with Rate = rate }}  , Cmd.none
+
+        { model with
+              Input = { model.Input with Rate = rate } },
+        Cmd.none
     | SetAccPeriod v ->
-        {model with Input = {model.Input with AccountingPeriod = v }}  , Cmd.none
+        { model with
+              Input =
+                  { model.Input with
+                        AccountingPeriod = v } },
+        Cmd.none
     | SetMandays v ->
         let md =
             match Byte.TryParse v with
-            | true,parsed -> Validated.success v parsed
+            | true, parsed -> Validated.success v parsed
             | false, _ -> Validated.failure v
-        {model with Input = {model.Input with ManDays = md }}  , Cmd.none
+
+        { model with
+              Input = { model.Input with ManDays = md } },
+        Cmd.none
+    | HandleError exn ->
+        { model with
+              IsLoading = false
+              Result = Some(Error exn.Message) },
+        Cmd.none
 
 open Fable.React
 open Fable.React.Props
@@ -89,61 +111,64 @@ let navBrand =
 
 let containerBox (model: Model) (dispatch: Msg -> unit) =
     Box.box' [] [
-        //Content.content [ ] [
-        //    Content.Ol.ol [ ] [
-        //        for todo in model.Todos ->
-        //            li [ ] [ str todo.Description ]
-        //    ]
-        //]
-        Field.div [ Field.IsGrouped ] [
-            Control.p [ Control.IsExpanded ] [
-                Label.label [] [ str "Man-day rate" ]
-                Input.text [ Input.Value(model.Input.Rate.Raw)
-                             Input.Placeholder "Man-day rate in CZK"
-                             Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
-            ]
-        ]
-        Field.div [ Field.IsGrouped ] [
-            Control.p [ Control.IsExpanded ] [
-                Label.label [] [ str "Month of year" ]
-                Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
-                                      Flatpickr.Value
-                                          (System.DateTime
-                                              (int model.Input.AccountingPeriod.Year,
-                                               int model.Input.AccountingPeriod.Month,
-                                               1))
-                                      Flatpickr.DateFormat "F Y"
-                                      Flatpickr.custom
-                                          "plugins"
-                                          [| monthSelectPlugin
-                                              ({| shorthand = true
-                                                  dateFormat = "F Y"
-                                                  altFormat = "F Y" |}) |]
-
-                                          true
-                                      Flatpickr.Locale Flatpickr.Locales.czech
-                                      Flatpickr.ClassName "input" ]
-            ]
-        ]
-
-        Field.div [ Field.IsGrouped ] [
-            Control.p [ Control.IsExpanded ] [
-                Label.label [] [
-                    str "Total number of man days"
+        fieldset [ Disabled model.IsLoading ] [
+            //Content.content [ ] [
+            //    Content.Ol.ol [ ] [
+            //        for todo in model.Todos ->
+            //            li [ ] [ str todo.Description ]
+            //    ]
+            //]
+            Field.div [ Field.IsGrouped ] [
+                Control.p [ Control.IsExpanded ] [
+                    Label.label [] [ str "Man-day rate" ]
+                    Input.text [ Input.Value(model.Input.Rate.Raw)
+                                 Input.Placeholder "Man-day rate in CZK"
+                                 Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
                 ]
-                Input.text [ Input.Value(model.Input.ManDays.Raw)
-                             Input.Placeholder "Total number of man days"
-                             Input.OnChange(fun x -> SetMandays x.Value |> dispatch)
-
-                              ]
             ]
-        ]
-        Field.div [ Field.IsGrouped ] [
-            Control.p [] [
-                Button.a [ Button.Color IsPrimary
-                           Button.Disabled (isValid model.Input |> not)
-                           Button.OnClick(fun _ -> dispatch AddInvoice) ] [
-                    str "Add"
+            Field.div [ Field.IsGrouped ] [
+                Control.p [ Control.IsExpanded ] [
+                    Label.label [] [ str "Month of year" ]
+                    Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
+                                          Flatpickr.Value
+                                              (System.DateTime
+                                                  (int model.Input.AccountingPeriod.Year,
+                                                   int model.Input.AccountingPeriod.Month,
+                                                   1))
+                                          Flatpickr.DateFormat "F Y"
+                                          Flatpickr.custom
+                                              "plugins"
+                                              [| monthSelectPlugin
+                                                  ({| shorthand = true
+                                                      dateFormat = "F Y"
+                                                      altFormat = "F Y" |}) |]
+
+                                              true
+                                          Flatpickr.Locale Flatpickr.Locales.czech
+                                          Flatpickr.ClassName "input" ]
+                ]
+            ]
+
+            Field.div [ Field.IsGrouped ] [
+                Control.p [ Control.IsExpanded ] [
+                    Label.label [] [
+                        str "Total number of man days"
+                    ]
+                    Input.text [ Input.Value(model.Input.ManDays.Raw)
+                                 Input.Placeholder "Total number of man days"
+                                 Input.OnChange(fun x -> SetMandays x.Value |> dispatch)
+
+                                  ]
+                ]
+            ]
+            Field.div [ Field.IsGrouped ] [
+                Control.p [] [
+                    Button.a [ Button.Color IsPrimary
+                               Button.IsLoading model.IsLoading
+                               Button.Disabled(isValid model.Input |> not)
+                               Button.OnClick(fun _ -> dispatch AddInvoice) ] [
+                        str "Add"
+                    ]
                 ]
             ]
         ]
@@ -179,7 +204,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                      | Ok s
                                      | Error s -> s)
                             ]
-                        | None _ -> ()
+                        | None _ ->
+                            Notification.notification [ Notification.Modifiers [ Modifier.IsInvisible(Screen.All, true) ] ] []
                     ]
                 ]
             ]

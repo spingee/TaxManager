@@ -22,7 +22,8 @@ let isValid input =
 type Model =
     { Input: InvoiceInput
       Title: string
-      Result: Result<string, string> option }
+      Result: Result<string, string> option
+      IsLoading: bool }
 
 module Validated =
     let createEmpty() : Validated<_> =

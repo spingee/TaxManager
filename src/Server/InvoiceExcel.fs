@@ -15,7 +15,7 @@ let createExcelAndPdfInvoice (destFileWithoutExtension:string) invoice =
     let workbook = ExcelFile.Load(path)
 
 
-    let ws = workbook.Worksheets.[1]
+    let ws = workbook.Worksheets.[0]
     let invoiceNumber = getInvoiceNumber invoice
     let date = System.DateTime(int invoice.AccountingPeriod.Year,int invoice.AccountingPeriod.Month,1,CultureInfo("cs-CZ").Calendar)
     let dateOfTaxableSupply = date.AddMonths(1).AddDays(-1.0)
