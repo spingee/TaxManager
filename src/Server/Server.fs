@@ -5,6 +5,7 @@ open Fable.Remoting.Giraffe
 open Saturn
 open System
 open Shared
+open Invoice
 open InvoiceExcel
 open GemBox.Spreadsheet
 
@@ -46,11 +47,16 @@ let invoiceApi =
           fun invoice ->
               async {
                   try
-                    let outputFile = sprintf "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01.xlsx" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month
-                    createExcelAndPdfInvoice outputFile invoice
-                    return Ok "Success"
-                  with ex ->
-                    return Error <| sprintf "%s" ex.Message
+                      let outputFile =
+                          sprintf
+                              "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01.xlsx"
+                              invoice.AccountingPeriod.Year
+                              invoice.AccountingPeriod.Month
+
+                      createExcelAndPdfInvoice outputFile invoice
+
+                      return Ok "Success"
+                  with ex -> return Error <| sprintf "%s" ex.Message
 
               } }
 
@@ -69,5 +75,6 @@ let app =
         use_static "public"
         use_gzip
     }
+
 SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
 run app

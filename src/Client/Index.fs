@@ -1,100 +1,12 @@
 module Index
 
-open Elmish
-open Fable.Remoting.Client
-open Shared
-open System
-open Types
-
-
-
-
-type Msg =
-    | AddInvoice
-    | AddedInvoice of Result<string, string>
-    | SetRate of string
-    | SetAccPeriod of DateTime
-    | SetMandays of string
-    | HandleError of Exception
-
-let todosApi =
-    Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<ITodosApi>
-
-let invoiceApi =
-    Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<IInvoiceApi>
-
-let init (): Model * Cmd<Msg> =
-    let model =
-        { Input =
-              { Rate = Validated.success "6000" <| uint16 6000
-                ManDays = Validated.success "20" 20uy
-                AccountingPeriod = DateTime.Now.AddMonths(-1) }
-          Title = "Submit invoice data"
-          Result = None
-          IsLoading = false }
-
-    let cmd = Cmd.none //Cmd.OfAsync.perform todosApi.getTodos () GotTodos
-    model, cmd
-
-let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
-    match msg with
-    | AddedInvoice result ->
-        { model with
-              Result = Some result
-              IsLoading = false },
-        Cmd.none
-    | AddInvoice ->
-        let invoice: Shared.Invoice =
-            { Rate = model.Input.Rate.Parsed.Value
-              ManDays = model.Input.ManDays.Parsed.Value
-              AccountingPeriod =
-                  { Month = uint8 model.Input.AccountingPeriod.Month
-                    Year = uint16 model.Input.AccountingPeriod.Year } }
-
-        let model = { model with IsLoading = true }
-
-        let cmd =
-            Cmd.OfAsync.either invoiceApi.addInvoice invoice AddedInvoice HandleError
-
-        model, cmd
-    | SetRate v ->
-        let rate =
-            match UInt16.TryParse v with
-            | true, parsed -> Validated.success v parsed
-            | false, _ -> Validated.failure v
-
-        { model with
-              Input = { model.Input with Rate = rate } },
-        Cmd.none
-    | SetAccPeriod v ->
-        { model with
-              Input =
-                  { model.Input with
-                        AccountingPeriod = v } },
-        Cmd.none
-    | SetMandays v ->
-        let md =
-            match Byte.TryParse v with
-            | true, parsed -> Validated.success v parsed
-            | false, _ -> Validated.failure v
-
-        { model with
-              Input = { model.Input with ManDays = md } },
-        Cmd.none
-    | HandleError exn ->
-        { model with
-              IsLoading = false
-              Result = Some(Error exn.Message) },
-        Cmd.none
-
 open Fable.React
 open Fable.React.Props
 open Fulma
 open Fable.Core.JsInterop
+open State
+open Types
+open Fable.FontAwesome
 
 let monthSelectPlugin (x: obj): obj -> obj =
     importDefault "flatpickr/dist/plugins/monthSelect"
@@ -111,7 +23,7 @@ let navBrand =
 
 let containerBox (model: Model) (dispatch: Msg -> unit) =
     Box.box' [] [
-        fieldset [ Disabled model.IsLoading ] [
+        fieldset [ ReadOnly model.IsLoading ] [
             //Content.content [ ] [
             //    Content.Ol.ol [ ] [
             //        for todo in model.Todos ->
@@ -156,9 +68,33 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                     ]
                     Input.text [ Input.Value(model.Input.ManDays.Raw)
                                  Input.Placeholder "Total number of man days"
-                                 Input.OnChange(fun x -> SetMandays x.Value |> dispatch)
+                                 Input.OnChange(fun x -> SetMandays x.Value |> dispatch) ]
+                ]
+            ]
+            Field.div [ Field.IsExpanded ] [
+                Label.label [] [ str "Customer" ]
+                Field.p [ Field.HasAddons ] [
+                    Control.div [ Control.IsExpanded ] [
 
-                                  ]
+
+                        Select.select [ Select.IsFullWidth ] [
+                            select [] [
+                                option [ Value(System.Guid.NewGuid()) ] [
+                                    str "Principal engineering s.r.o."
+                                ]
+                                option [ Value(System.Guid.NewGuid()) ] [
+                                    str "stvol"
+                                ]
+                            ]
+                        ]
+                    ]
+                    Control.div [] [
+                        Button.a [ Button.Color IsPrimary ] [
+                            Icon.icon [] [
+                                Fa.i [ Fa.Solid.Plus ] []
+                            ]
+                        ]
+                    ]
                 ]
             ]
             Field.div [ Field.IsGrouped ] [
