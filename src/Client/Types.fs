@@ -1,38 +1,32 @@
 module Types
-open Shared
+
+open Shared.Invoice
 open System
 
-type Validated<'t> =
-    {  Raw : string
-       Parsed : Option<'t> }
+type Validated<'t> = { Raw: string; Parsed: Option<'t> }
 
-type InvoiceInput = {
-    ManDays: Validated<uint8>
-    Rate: Validated<uint16>
-    AccountingPeriod: DateTime
-}
+type InvoiceInput =
+    { ManDays: Validated<uint8>
+      Rate: Validated<uint16>
+      AccountingPeriod: DateTime
+      CustomerId: Validated<Guid> }
 
 let isValid input =
-    let {InvoiceInput.ManDays = mandays; Rate = rate} = input
-    match (mandays.Parsed,rate.Parsed) with
-    |Some _,Some _ -> true
-    |_,_ -> false
+    let { ManDays = mandays; Rate = rate; CustomerId = customerId } = input
+    match (mandays.Parsed, rate.Parsed, customerId.Parsed) with
+    | Some _, Some _, Some _ -> true
+    | _, _, _ -> false
 
 
 type Model =
     { Input: InvoiceInput
       Title: string
       Result: Result<string, string> option
-      IsLoading: bool }
+      IsLoading: bool
+      CreatingCustomer: bool
+      Customers: Customer list }
 
 module Validated =
-    let createEmpty() : Validated<_> =
-        { Raw = ""; Parsed = None }
-
-    let success raw value : Validated<_> =
-        { Raw = raw; Parsed = Some value }
-
-    let failure raw : Validated<_> =
-        { Raw = raw; Parsed = None }
-
-
+    let createEmpty (): Validated<_> = { Raw = ""; Parsed = None }
+    let success raw value: Validated<_> = { Raw = raw; Parsed = Some value }
+    let failure raw: Validated<_> = { Raw = raw; Parsed = None }

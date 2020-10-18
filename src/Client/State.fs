@@ -6,7 +6,6 @@ open Shared
 open Shared.Invoice
 open System
 open Types
-open Result.ResultEx
 
 type Msg =
     | AddInvoice
@@ -14,7 +13,11 @@ type Msg =
     | SetRate of string
     | SetAccPeriod of DateTime
     | SetMandays of string
+    | SetCustomer of string
+    | BeginCreateCustomer
+    | EndCreateCustomer
     | HandleException of Exception
+    | LoadCustomers of Result<Customer list, string>
 
 let invoiceApi =
     Remoting.createApi ()
@@ -26,12 +29,17 @@ let init (): Model * Cmd<Msg> =
         { Input =
               { Rate = Validated.success "6000" <| uint16 6000
                 ManDays = Validated.success "20" 20uy
-                AccountingPeriod = DateTime.Now.AddMonths(-1) }
+                AccountingPeriod = DateTime.Now.AddMonths(-1)
+                CustomerId = Validated.createEmpty () }
           Title = "Submit invoice data"
           Result = None
-          IsLoading = false }
+          IsLoading = true
+          CreatingCustomer = false
+          Customers = [] }
 
-    let cmd = Cmd.none //Cmd.OfAsync.perform todosApi.getTodos () GotTodos
+    let cmd =
+        Cmd.OfAsync.either invoiceApi.getCustomers () LoadCustomers HandleException
+
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
@@ -48,9 +56,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
                 return { Id = Guid.NewGuid()
                          Customer =
-                             { Name = "Principal engineering s.r.o."
-                               IdNumber = uint 26775794
-                               VatId = vatId }
+                             model.Customers
+                             |> List.find (fun c -> c.Id = model.Input.CustomerId.Parsed.Value)
                          Rate = model.Input.Rate.Parsed.Value
                          ManDays = model.Input.ManDays.Parsed.Value
                          AccountingPeriod = model.Input.AccountingPeriod }
@@ -92,8 +99,40 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         { model with
               Input = { model.Input with ManDays = md } },
         Cmd.none
+    | SetCustomer v ->
+        let c =
+            match Guid.TryParse v with
+            | true, parsed -> Validated.success v parsed
+            | false, _ -> Validated.failure v
+
+        { model with
+              Input = { model.Input with CustomerId = c } },
+        Cmd.none
     | HandleException exn ->
         { model with
               IsLoading = false
               Result = Some(Error exn.Message) },
+        Cmd.none
+    | BeginCreateCustomer -> { model with CreatingCustomer = true }, Cmd.none
+    | EndCreateCustomer -> { model with CreatingCustomer = false }, Cmd.none
+    | LoadCustomers result ->
+        { model with
+              Customers =
+                  match result with
+                  | Ok cs -> cs
+                  | Error _ -> []
+              Input =
+                  match result with
+                  | Ok cs ->
+                      if (cs.Length > 0) then
+                          { model.Input with
+                                CustomerId = Validated.success (cs.Head.Id.ToString()) cs.Head.Id }
+                      else
+                          model.Input
+                  | Error _ -> model.Input
+              Result =
+                  match result with
+                  | Ok _ -> None
+                  | Error s -> Some(Error s)
+              IsLoading = false },
         Cmd.none

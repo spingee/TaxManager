@@ -1,4 +1,4 @@
-namespace Result
+namespace Shared
 
 [<AutoOpen>]
 module ResultEx =

@@ -9,39 +9,6 @@ open Invoice
 open InvoiceExcel
 open GemBox.Spreadsheet
 
-type Storage() =
-    let todos = ResizeArray<_>()
-
-    member __.GetTodos() = List.ofSeq todos
-
-    member __.AddTodo(todo: Todo) =
-        if Todo.isValid todo.Description then
-            todos.Add todo
-            Ok()
-        else
-            Error "Invalid todo"
-
-let storage = Storage()
-
-storage.AddTodo(Todo.create "Create new SAFE project")
-|> ignore
-
-storage.AddTodo(Todo.create "Write your app")
-|> ignore
-
-storage.AddTodo(Todo.create "Ship it !!!")
-|> ignore
-
-let todosApi =
-    { getTodos = fun () -> async { return storage.GetTodos() }
-      addTodo =
-          fun todo ->
-              async {
-                  match storage.AddTodo todo with
-                  | Ok () -> return todo
-                  | Error e -> return failwith e
-              } }
-
 let invoiceApi =
     { addInvoice =
           fun invoice ->
@@ -58,6 +25,23 @@ let invoiceApi =
                       return Ok "Success"
                   with ex -> return Error <| sprintf "%s" ex.Message
 
+              }
+      getCustomers =
+          fun () ->
+              let cust =
+                  result {
+                      let! vatId = createVatId "CZ26775794"
+
+                      return { Id = Guid.NewGuid()
+                               Name = "Principal engineering s.r.o."
+                               IdNumber = uint 26775794
+                               VatId = vatId }
+                  }
+
+              async {
+                  match cust with
+                  | Error e -> return Error e
+                  | Ok c -> return Ok [ c ]
               } }
 
 let webApp =

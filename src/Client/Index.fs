@@ -20,6 +20,50 @@ let navBrand =
     ]
 
 
+let createCustomerModal model dispatch =
+    Modal.modal [ Modal.IsActive model.CreatingCustomer ] [
+        Modal.background [] []
+        Modal.Card.card [] [
+            Modal.Card.head [] [
+                Modal.Card.title [] [
+                    str "Create customer"
+                ]
+                Delete.delete [ Delete.OnClick(fun _ -> dispatch EndCreateCustomer) ] []
+            ]
+            Modal.Card.body [] [
+
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "Name" ]
+                        Input.text [ Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+                    ]
+                ]
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [
+                            str "Identification number"
+                        ]
+                        Input.text [ Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+                    ]
+                ]
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "VAT Id" ]
+                        Input.text [ Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+                    ]
+                ]
+            ]
+            Modal.Card.foot [] [
+                Button.button [ Button.Color IsSuccess
+                                Button.OnClick(fun _ -> dispatch EndCreateCustomer) ] [
+                    str "Create"
+                ]
+                Button.button [ Button.OnClick(fun _ -> dispatch EndCreateCustomer) ] [
+                    str "Cancel"
+                ]
+            ]
+        ]
+    ]
 
 let containerBox (model: Model) (dispatch: Msg -> unit) =
     Box.box' [] [
@@ -75,21 +119,20 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                 Label.label [] [ str "Customer" ]
                 Field.p [ Field.HasAddons ] [
                     Control.div [ Control.IsExpanded ] [
-
-
                         Select.select [ Select.IsFullWidth ] [
-                            select [] [
-                                option [ Value(System.Guid.NewGuid()) ] [
-                                    str "Principal engineering s.r.o."
-                                ]
-                                option [ Value(System.Guid.NewGuid()) ] [
-                                    str "stvol"
-                                ]
+                            select [ OnChange(fun e -> dispatch <| SetCustomer e.Value) ] [
+                                yield option [ Value("") ] [ str "" ]
+                                for c in model.Customers ->
+                                    option [ Value(c.Id)
+                                             Selected(model.Input.CustomerId.Parsed.Value = c.Id) ] [
+                                        str c.Name
+                                    ]
                             ]
                         ]
                     ]
                     Control.div [] [
-                        Button.a [ Button.Color IsPrimary ] [
+                        Button.a [ Button.Color IsPrimary
+                                   Button.OnClick(fun _ -> dispatch BeginCreateCustomer) ] [
                             Icon.icon [] [
                                 Fa.i [ Fa.Solid.Plus ] []
                             ]
@@ -108,6 +151,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                 ]
             ]
         ]
+        createCustomerModal model dispatch
     ]
 
 let view (model: Model) (dispatch: Msg -> unit) =

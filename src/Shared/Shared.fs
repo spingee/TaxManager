@@ -18,7 +18,8 @@ module Invoice =
         | false -> Error("Vat id has wrong format.")
 
     type Customer =
-        { IdNumber: uint
+        { Id: Guid
+          IdNumber: uint
           VatId: VatId
           Name: string }
 
@@ -30,7 +31,8 @@ module Invoice =
           Customer: Customer }
 
     type IInvoiceApi =
-        { addInvoice: Invoice -> Async<Result<string, string>> }
+        { addInvoice: Invoice -> Async<Result<string, string>>
+          getCustomers: unit -> Async<Result<Customer list, string>> }
 
 
 
