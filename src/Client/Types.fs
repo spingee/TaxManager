@@ -5,11 +5,17 @@ open System
 
 type Validated<'t> = { Raw: string; Parsed: Option<'t> }
 
+type CustomerInput ={
+    IdNumber: Validated<uint>
+    VatId: Validated<VatId>
+    Name: Validated<string>
+ }
+
 type InvoiceInput =
     { ManDays: Validated<uint8>
       Rate: Validated<uint16>
       AccountingPeriod: DateTime
-      CustomerId: Validated<Guid> }
+      Customer: CustomerInput }
 
 let isValid input =
     let { ManDays = mandays; Rate = rate; CustomerId = customerId } = input

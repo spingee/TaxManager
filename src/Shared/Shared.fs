@@ -18,8 +18,7 @@ module Invoice =
         | false -> Error("Vat id has wrong format.")
 
     type Customer =
-        { Id: Guid
-          IdNumber: uint
+        { IdNumber: uint
           VatId: VatId
           Name: string }
 
