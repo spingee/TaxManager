@@ -17,10 +17,14 @@ module Invoice =
         | true -> Ok(VatId str)
         | false -> Error("Vat id has wrong format.")
 
+    let getVatIdStr (VatId str) = str
+
+
     type Customer =
         { IdNumber: uint
           VatId: VatId
-          Name: string }
+          Name: string
+          Address: string }
 
     type Invoice =
         { Id: Guid

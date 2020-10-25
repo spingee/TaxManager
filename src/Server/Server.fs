@@ -8,6 +8,10 @@ open Shared
 open Invoice
 open InvoiceExcel
 open GemBox.Spreadsheet
+open LiteDB
+open LiteDB.FSharp
+open LiteDB.FSharp.Extensions
+open System.Linq
 
 let invoiceApi =
     { addInvoice =
@@ -22,39 +26,39 @@ let invoiceApi =
 
                       createExcelAndPdfInvoice outputFile invoice
 
+                      let mapper = FSharpBsonMapper()
+                      use db = new LiteDatabase("simple.db", mapper)
+                      let invoices = db.GetCollection<Invoice>("invoices")
+                      let invoice = {invoice with Id = Guid.NewGuid()}
+
+                      invoices.Insert(invoice) |> ignore
+
                       return Ok "Success"
                   with ex -> return Error <| sprintf "%s" ex.Message
 
               }
       getCustomers =
           fun () ->
-              let cust =
-                  result {
-                      let! vatId = createVatId "CZ26775794"
+              let mapper = FSharpBsonMapper() 
+              use db = new LiteDatabase("simple.db", mapper)
+              let invoices = db.GetCollection<Invoice>("invoices")
+              let customers = invoices.FindAll().Select(fun f->f.Customer)
+              
 
-                      return { Id = Guid.NewGuid()
-                               Name = "Principal engineering s.r.o."
-                               IdNumber = uint 26775794
-                               VatId = vatId }
-                  }
-
-              async {
-                  match cust with
-                  | Error e -> return Error e
-                  | Ok c -> return Ok [ c ]
+              async {                 
+                   return Ok [ yield! customers ]
               } }
 
 let webApp =
     Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder
-    //|> Remoting.fromValue todosApi
+    |> Remoting.withRouteBuilder Route.builder    
     |> Remoting.fromValue invoiceApi
     |> Remoting.buildHttpHandler
 
 let app =
     application {
         url "http://0.0.0.0:8085"
-        use_router webApp
+        use_router webApp        
         memory_cache
         use_static "public"
         use_gzip

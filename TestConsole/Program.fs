@@ -32,21 +32,6 @@ let main argv =
     albums.Insert(metallica) |> ignore
     let resultss = albums.findOne <@ fun album -> album.Id = 1 @>
 
-    let aa: Result<string, MyErr> =
-        result {
-            let! (a: string) = Ok "a string"
-            printfn "A: %A" a
-            //   let! b = Error Err2
-            //   printfn "B: %A" b
-            let! c = (Some "c string", Err1)
-            //   let! c = (None, Err1)
-            printfn "C: %A" c
 
-            let d = if true then a else c
-
-            printfn "D: %A" d
-
-            return d
-        }
     Console.ReadLine() |> ignore
     0

@@ -20,7 +20,7 @@ let navBrand =
     ]
 
 
-let createCustomerModal model dispatch =
+let createCustomerModal model (dispatch: Msg -> unit) =
     Modal.modal [ Modal.IsActive model.CreatingCustomer ] [
         Modal.background [] []
         Modal.Card.card [] [
@@ -28,14 +28,13 @@ let createCustomerModal model dispatch =
                 Modal.Card.title [] [
                     str "Create customer"
                 ]
-                Delete.delete [ Delete.OnClick(fun _ -> dispatch EndCreateCustomer) ] []
+                Delete.delete [ Delete.OnClick(fun _ -> dispatch <| EndCreateCustomer false) ] []
             ]
             Modal.Card.body [] [
-
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Name" ]
-                        Input.text [ Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch) ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
@@ -43,22 +42,30 @@ let createCustomerModal model dispatch =
                         Label.label [] [
                             str "Identification number"
                         ]
-                        Input.text [ Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch) ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "VAT Id" ]
-                        Input.text [ Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch) ]
+                    ]
+                ]
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "Address" ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch) ]
                     ]
                 ]
             ]
             Modal.Card.foot [] [
                 Button.button [ Button.Color IsSuccess
-                                Button.OnClick(fun _ -> dispatch EndCreateCustomer) ] [
+                                Button.Disabled
+                                <| not (Customer.isValid model.CustomerInput)
+                                Button.OnClick(fun _ -> dispatch <| EndCreateCustomer true) ] [
                     str "Create"
                 ]
-                Button.button [ Button.OnClick(fun _ -> dispatch EndCreateCustomer) ] [
+                Button.button [ Button.OnClick(fun _ -> dispatch <| EndCreateCustomer false) ] [
                     str "Cancel"
                 ]
             ]
@@ -68,16 +75,10 @@ let createCustomerModal model dispatch =
 let containerBox (model: Model) (dispatch: Msg -> unit) =
     Box.box' [] [
         fieldset [ ReadOnly model.IsLoading ] [
-            //Content.content [ ] [
-            //    Content.Ol.ol [ ] [
-            //        for todo in model.Todos ->
-            //            li [ ] [ str todo.Description ]
-            //    ]
-            //]
             Field.div [ Field.IsGrouped ] [
                 Control.p [ Control.IsExpanded ] [
                     Label.label [] [ str "Man-day rate" ]
-                    Input.text [ Input.Value(model.Input.Rate.Raw)
+                    Input.text [ Input.Value(model.InvoiceInput.Rate.Raw)
                                  Input.Placeholder "Man-day rate in CZK"
                                  Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
                 ]
@@ -88,8 +89,8 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                     Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
                                           Flatpickr.Value
                                               (System.DateTime
-                                                  (int model.Input.AccountingPeriod.Year,
-                                                   int model.Input.AccountingPeriod.Month,
+                                                  (int model.InvoiceInput.AccountingPeriod.Year,
+                                                   int model.InvoiceInput.AccountingPeriod.Month,
                                                    1))
                                           Flatpickr.DateFormat "F Y"
                                           Flatpickr.custom
@@ -110,7 +111,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                     Label.label [] [
                         str "Total number of man days"
                     ]
-                    Input.text [ Input.Value(model.Input.ManDays.Raw)
+                    Input.text [ Input.Value(model.InvoiceInput.ManDays.Raw)
                                  Input.Placeholder "Total number of man days"
                                  Input.OnChange(fun x -> SetMandays x.Value |> dispatch) ]
                 ]
@@ -120,13 +121,14 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                 Field.p [ Field.HasAddons ] [
                     Control.div [ Control.IsExpanded ] [
                         Select.select [ Select.IsFullWidth ] [
-                            select [ OnChange(fun e -> dispatch <| SetCustomer e.Value) ] [
+                            select [ OnChange(fun e -> dispatch <| SelectCustomer e.Value) ] [
                                 yield option [ Value("") ] [ str "" ]
-                                for c in model.Customers ->
-                                    option [ Value(c.Id)
-                                             Selected(model.Input.CustomerId.Parsed.Value = c.Id) ] [
-                                        str c.Name
-                                    ]
+                                for i = 0 to model.Customers.Length - 1 do
+                                    let c = model.Customers.[i]
+                                    yield option [ Value(i)
+                                                   Selected(model.SelectedCustomer = Some c) ] [
+                                              str c.Name
+                                          ]
                             ]
                         ]
                     ]
@@ -144,7 +146,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                 Control.p [] [
                     Button.a [ Button.Color IsPrimary
                                Button.IsLoading model.IsLoading
-                               Button.Disabled(isValid model.Input |> not)
+                               Button.Disabled(isModelValid model |> not)
                                Button.OnClick(fun _ -> dispatch AddInvoice) ] [
                         str "Add"
                     ]
@@ -157,8 +159,9 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
 let view (model: Model) (dispatch: Msg -> unit) =
     Hero.hero [ Hero.Color IsPrimary
                 Hero.IsFullHeight
-                Hero.Props [ Style [ Background """url("kid2.png") no-repeat center center fixed"""
-                                     BackgroundSize "cover" ] ] ] [
+                Hero.Props
+                    [ Style [ Background """url("kid2.png") no-repeat center center fixed"""
+                              BackgroundSize "cover" ] ] ] [
         Hero.head [] [
             Navbar.navbar [] [
                 Container.container [] [ navBrand ]
@@ -185,7 +188,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                      | Error s -> s)
                             ]
                         | None _ ->
-                            Notification.notification [ Notification.Modifiers [ Modifier.IsInvisible(Screen.All, true) ] ] []
+                            Notification.notification [ Notification.Modifiers
+                                                            [ Modifier.IsInvisible(Screen.All, true) ] ] []
                     ]
                 ]
             ]

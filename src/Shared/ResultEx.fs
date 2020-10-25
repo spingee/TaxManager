@@ -1,7 +1,7 @@
 namespace Shared
 
 [<AutoOpen>]
-module ResultEx =
+module Result =
 
     open System
 
@@ -58,23 +58,4 @@ module ResultEx =
 
     let result = new ResultBuilder()
 
-    type MyErr =
-        | Err1
-        | Err2
 
-    let aa: Result<string, MyErr> =
-        result {
-            let! (a: string) = Ok "a string"
-            printfn "A: %A" a
-            //   let! b = Error Err2
-            //   printfn "B: %A" b
-            let! c = (Some "c string", Err1)
-            //   let! c = (None, Err1)
-            printfn "C: %A" c
-
-            let d = if true then a else c
-
-            printfn "D: %A" d
-
-            return d
-        }

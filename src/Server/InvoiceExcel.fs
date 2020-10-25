@@ -44,5 +44,9 @@ let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice =
     ws.Cells.["D25"].Value <- sprintf "%i,-Kč" sumWithoutTax
     ws.Cells.["D26"].Value <- sprintf "%.0f,-Kč" tax
     ws.Cells.["D27"].Value <- sprintf "%.0f,-Kč" total
+    ws.Cells.["C11"].Value <- invoice.Customer.Address
+    ws.Cells.["C10"].Value <- invoice.Customer.Name
+    ws.Cells.["D7"].Value <- invoice.Customer.IdNumber
+    ws.Cells.["D8"].Value <- getVatIdStr invoice.Customer.VatId
     workbook.Save(sprintf "%s.xlsx" destFileWithoutExtension)
     workbook.Save(sprintf "%s.pdf" destFileWithoutExtension)

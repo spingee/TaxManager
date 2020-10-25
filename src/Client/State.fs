@@ -13,9 +13,13 @@ type Msg =
     | SetRate of string
     | SetAccPeriod of DateTime
     | SetMandays of string
-    | SetCustomer of string
+    | SetCustomerIdNumber of string
+    | SetCustomerVatId of string
+    | SetCustomerName of string
+    | SetCustomerAddress of string
+    | SelectCustomer of string
     | BeginCreateCustomer
-    | EndCreateCustomer
+    | EndCreateCustomer of bool
     | HandleException of Exception
     | LoadCustomers of Result<Customer list, string>
 
@@ -24,18 +28,25 @@ let invoiceApi =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IInvoiceApi>
 
+
+
 let init (): Model * Cmd<Msg> =
     let model =
-        { Input =
+        { InvoiceInput =
               { Rate = Validated.success "6000" <| uint16 6000
                 ManDays = Validated.success "20" 20uy
-                AccountingPeriod = DateTime.Now.AddMonths(-1)
-                CustomerId = Validated.createEmpty () }
+                AccountingPeriod = DateTime.Now.AddMonths(-1) }
+          CustomerInput =
+              { IdNumber = Validated.createEmpty ()
+                VatId = Validated.createEmpty ()
+                Name = Validated.createEmpty ()
+                Address = Validated.createEmpty() }
           Title = "Submit invoice data"
           Result = None
           IsLoading = true
           CreatingCustomer = false
-          Customers = [] }
+          Customers = []
+          SelectedCustomer = None }
 
     let cmd =
         Cmd.OfAsync.either invoiceApi.getCustomers () LoadCustomers HandleException
@@ -52,15 +63,17 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | AddInvoice ->
         let inv =
             result {
-                let! vatId = createVatId "CZ26775794"
+
+                let! customer =
+                    match model.SelectedCustomer with
+                    | Some c -> Ok c
+                    | None -> Error "No customer selected."
 
                 return { Id = Guid.NewGuid()
-                         Customer =
-                             model.Customers
-                             |> List.find (fun c -> c.Id = model.Input.CustomerId.Parsed.Value)
-                         Rate = model.Input.Rate.Parsed.Value
-                         ManDays = model.Input.ManDays.Parsed.Value
-                         AccountingPeriod = model.Input.AccountingPeriod }
+                         Customer = customer
+                         Rate = model.InvoiceInput.Rate.Parsed.Value
+                         ManDays = model.InvoiceInput.ManDays.Parsed.Value
+                         AccountingPeriod = model.InvoiceInput.AccountingPeriod }
             }
 
         match inv with
@@ -82,12 +95,12 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | false, _ -> Validated.failure v
 
         { model with
-              Input = { model.Input with Rate = rate } },
+              InvoiceInput = { model.InvoiceInput with Rate = rate } },
         Cmd.none
     | SetAccPeriod v ->
         { model with
-              Input =
-                  { model.Input with
+              InvoiceInput =
+                  { model.InvoiceInput with
                         AccountingPeriod = v } },
         Cmd.none
     | SetMandays v ->
@@ -97,16 +110,50 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | false, _ -> Validated.failure v
 
         { model with
-              Input = { model.Input with ManDays = md } },
+              InvoiceInput = { model.InvoiceInput with ManDays = md } },
         Cmd.none
-    | SetCustomer v ->
-        let c =
-            match Guid.TryParse v with
+    | SetCustomerIdNumber v ->
+        let idNumber =
+            match UInt32.TryParse v with
             | true, parsed -> Validated.success v parsed
             | false, _ -> Validated.failure v
 
         { model with
-              Input = { model.Input with CustomerId = c } },
+              CustomerInput =
+                  { model.CustomerInput with
+                        IdNumber = idNumber } },
+        Cmd.none
+    | SetCustomerVatId v ->
+        let model' =
+            result {
+                let! vatId = createVatId v
+
+                return { model with
+                             CustomerInput =
+                                 { model.CustomerInput with
+                                       VatId = Validated.success v vatId } }
+            }
+
+        match model' with
+        | Ok m -> m, Cmd.none
+        | _ -> model, Cmd.none
+    | SetCustomerName v ->
+        let name =
+            match String.IsNullOrEmpty(v) with
+            | false -> Validated.success v v
+            | true -> Validated.failure v
+
+        { model with
+              CustomerInput = { model.CustomerInput with Name = name } },
+        Cmd.none
+    | SetCustomerAddress v ->
+        let address =
+            match String.IsNullOrEmpty(v) with
+            | false -> Validated.success v v
+            | true -> Validated.failure v
+
+        { model with
+              CustomerInput = { model.CustomerInput with Address = address } },
         Cmd.none
     | HandleException exn ->
         { model with
@@ -114,22 +161,34 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Result = Some(Error exn.Message) },
         Cmd.none
     | BeginCreateCustomer -> { model with CreatingCustomer = true }, Cmd.none
-    | EndCreateCustomer -> { model with CreatingCustomer = false }, Cmd.none
+    | EndCreateCustomer true ->
+        let cust =
+            Customer.fromCustomerInput model.CustomerInput
+        let model = { model with CreatingCustomer = false }
+        match cust with
+        | Some c ->
+            { model with
+                  Customers = c :: model.Customers
+                  SelectedCustomer = cust },
+            Cmd.none
+        | None -> model, Cmd.none
+    | EndCreateCustomer false -> { model with CreatingCustomer = false }, Cmd.none
+    | SelectCustomer str ->
+        let model =
+            if not (String.IsNullOrWhiteSpace str) then
+                { model with SelectedCustomer = Some model.Customers.[(int str)] }
+            else { model with SelectedCustomer = None }
+        model,Cmd.none
     | LoadCustomers result ->
         { model with
               Customers =
                   match result with
                   | Ok cs -> cs
                   | Error _ -> []
-              Input =
+              SelectedCustomer =
                   match result with
-                  | Ok cs ->
-                      if (cs.Length > 0) then
-                          { model.Input with
-                                CustomerId = Validated.success (cs.Head.Id.ToString()) cs.Head.Id }
-                      else
-                          model.Input
-                  | Error _ -> model.Input
+                  | Ok cs when cs.Length > 0 -> Some cs.Head
+                  | _ -> None
               Result =
                   match result with
                   | Ok _ -> None
