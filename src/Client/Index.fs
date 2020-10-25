@@ -127,7 +127,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                                     let c = model.Customers.[i]
                                     yield option [ Value(i)
                                                    Selected(model.SelectedCustomer = Some c) ] [
-                                              str c.Name
+                                              str <| sprintf "%s (%i)" c.Name c.IdNumber
                                           ]
                             ]
                         ]

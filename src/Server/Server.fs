@@ -9,9 +9,7 @@ open Invoice
 open InvoiceExcel
 open GemBox.Spreadsheet
 open LiteDB
-open LiteDB.FSharp
-open LiteDB.FSharp.Extensions
-open System.Linq
+//open System.Linq
 
 let invoiceApi =
     { addInvoice =
@@ -25,12 +23,12 @@ let invoiceApi =
                               invoice.AccountingPeriod.Month
 
                       createExcelAndPdfInvoice outputFile invoice
-
-                      let mapper = FSharpBsonMapper()
-                      use db = new LiteDatabase("simple.db", mapper)
-                      let invoices = db.GetCollection<Invoice>("invoices")
+                    
+                     
+                      use db = new LiteDatabase("simple.db")
+                      let invoices = db.GetCollection<Dto.Invoice>("invoices")
                       let invoice = {invoice with Id = Guid.NewGuid()}
-
+                                    |> Dto.toInvoiceDto
                       invoices.Insert(invoice) |> ignore
 
                       return Ok "Success"
@@ -38,15 +36,19 @@ let invoiceApi =
 
               }
       getCustomers =
-          fun () ->
-              let mapper = FSharpBsonMapper() 
-              use db = new LiteDatabase("simple.db", mapper)
-              let invoices = db.GetCollection<Invoice>("invoices")
-              let customers = invoices.FindAll().Select(fun f->f.Customer)
-              
-
+          fun () ->              
+              use db = new LiteDatabase("simple.db")
+              let invoices = db.GetCollection<Dto.Invoice>("invoices")
+              //let customers = invoices.FindAll().Select(fun f->f.Customer)
+              // BsonExpression.Create("group by") // todo
+              let custs = invoices.Query().Select(fun i -> i.Customer).ToArray()
+                            |> Array.groupBy id
+                            |> Array.map (fun x -> fst x)
+                            |> Array.map Dto.fromCustomerDto                           
+                            |> Array.filter (function | Ok _ -> true | _ -> false )
+                            |> Array.map (fun (Ok c) -> c)
               async {                 
-                   return Ok [ yield! customers ]
+                   return Ok [yield! custs]
               } }
 
 let webApp =

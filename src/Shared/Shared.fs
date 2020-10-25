@@ -4,10 +4,9 @@ open System
 open System.Text.RegularExpressions
 
 
-type Todo = { Id: Guid; Description: string }
-
 module Invoice =
-    type VatId = internal VatId of string
+    // for not not internal , becouse it wont serialze trough fable.remoting
+    type VatId = VatId of string
 
     let createVatId str =
         let legit =
@@ -38,19 +37,6 @@ module Invoice =
           getCustomers: unit -> Async<Result<Customer list, string>> }
 
 
-
-
-module Todo =
-    let isValid (description: string) =
-        String.IsNullOrWhiteSpace description |> not
-
-    let create (description: string) =
-        { Id = Guid.NewGuid()
-          Description = description }
-
 module Route =
     let builder typeName methodName = sprintf "/api/%s/%s" typeName methodName
 
-type ITodosApi =
-    { getTodos: unit -> Async<Todo list>
-      addTodo: Todo -> Async<Todo> }

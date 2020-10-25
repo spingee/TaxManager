@@ -10,6 +10,7 @@
     <Content Include="InvoiceTemplate.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Compile Include="Dto.fs" />
     <Compile Include="InvoiceExcel.fs" />
     <None Include="paket.references" />
     <Compile Include="Server.fs" />
