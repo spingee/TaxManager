@@ -21,13 +21,14 @@ let npm args workingDir =
         match ProcessUtils.tryFindFileOnPath "npm" with
         | Some path -> path
         | None ->
-            "npm was not found in path. Please install it and make sure it's available from your path. " +
-            "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
+            "npm was not found in path. Please install it and make sure it's available from your path. "
+            + "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
             |> failwith
 
-    let arguments = args |> String.split ' ' |> Arguments.OfArgs
+    let arguments =
+        args |> String.split ' ' |> Arguments.OfArgs
 
-    Command.RawCommand (npmPath, arguments)
+    Command.RawCommand(npmPath, arguments)
     |> CreateProcess.fromCommand
     |> CreateProcess.withWorkingDirectory workingDir
     |> CreateProcess.ensureExitCode
@@ -35,8 +36,11 @@ let npm args workingDir =
     |> ignore
 
 let dotnet cmd workingDir =
-    let result = DotNet.exec (DotNet.Options.withWorkingDirectory workingDir) cmd ""
-    if result.ExitCode <> 0 then failwithf "'dotnet %s' failed in %s" cmd workingDir
+    let result =
+        DotNet.exec (DotNet.Options.withWorkingDirectory workingDir) cmd ""
+
+    if result.ExitCode <> 0
+    then failwithf "'dotnet %s' failed in %s" cmd workingDir
 
 Target.create "Clean" (fun _ -> Shell.cleanDir deployDir)
 
@@ -44,32 +48,41 @@ Target.create "InstallClient" (fun _ -> npm "install" ".")
 
 Target.create "Bundle" (fun _ ->
     dotnet (sprintf "publish -c Release -o \"%s\"" deployDir) serverPath
-    npm "run build" "."
-)
+    npm "run build" ".")
 
 Target.create "Azure" (fun _ ->
-    let web = webApp {
-        name "Api"
-        zip_deploy "deploy"
-    }
-    let deployment = arm {
-        location Location.WestEurope
-        add_resource web
-    }
+    let web =
+        webApp {
+            name "Api"
+            zip_deploy "deploy"
+        }
+
+    let deployment =
+        arm {
+            location Location.WestEurope
+            add_resource web
+        }
 
     deployment
     |> Deploy.execute "Api" Deploy.NoParameters
-    |> ignore
-)
+    |> ignore)
 
 Target.create "Run" (fun _ ->
+    let openBrowser =
+        async {
+            System.Threading.Thread.Sleep(5000)
+            Proc.run
+            <| CreateProcess.fromRawCommandLine "cmd" "/C start http://localhost:8080/"
+            |> ignore
+        }
+
     dotnet "build" sharedPath
     [ async { dotnet "watch run" serverPath }
-      async { npm "run start" "." } ]
+      async { npm "run start" "." }
+      openBrowser ]
     |> Async.Parallel
     |> Async.RunSynchronously
-    |> ignore
-)
+    |> ignore)
 
 Target.create "RunTests" (fun _ ->
     dotnet "build" sharedTestsPath
@@ -77,22 +90,17 @@ Target.create "RunTests" (fun _ ->
       async { npm "run test:live" "." } ]
     |> Async.Parallel
     |> Async.RunSynchronously
-    |> ignore
-)
+    |> ignore)
 
 open Fake.Core.TargetOperators
 
 "Clean"
-    ==> "InstallClient"
-    ==> "Bundle"
-    ==> "Azure"
+==> "InstallClient"
+==> "Bundle"
+==> "Azure"
 
-"Clean"
-    ==> "InstallClient"
-    ==> "Run"
+"Clean" ==> "InstallClient" ==> "Run"
 
-"Clean"
-    ==> "InstallClient"
-    ==> "RunTests"
+"Clean" ==> "InstallClient" ==> "RunTests"
 
 Target.runOrDefaultWithArguments "Bundle"

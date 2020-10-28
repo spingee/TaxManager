@@ -174,6 +174,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         | None -> model, Cmd.none
     | EndCreateCustomer false -> { model with CreatingCustomer = false }, Cmd.none
     | SelectCustomer str ->
+
         let model =
             if not (String.IsNullOrWhiteSpace str) then
                 { model with SelectedCustomer = Some model.Customers.[(int str)] }

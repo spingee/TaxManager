@@ -122,7 +122,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                     Control.div [ Control.IsExpanded ] [
                         Select.select [ Select.IsFullWidth ] [
                             select [ OnChange(fun e -> dispatch <| SelectCustomer e.Value) ] [
-                                yield option [ Value("") ] [ str "" ]
+                                match model.SelectedCustomer with | None -> yield option [ Value("") ] [ str "" ] | _-> ()
                                 for i = 0 to model.Customers.Length - 1 do
                                     let c = model.Customers.[i]
                                     yield option [ Value(i)
