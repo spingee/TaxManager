@@ -23,7 +23,8 @@ module Invoice =
         { IdNumber: uint
           VatId: VatId
           Name: string
-          Address: string }
+          Address: string
+          Note: string option}
 
     type Invoice =
         { Id: Guid

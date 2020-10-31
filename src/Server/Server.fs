@@ -23,8 +23,8 @@ let invoiceApi =
                               invoice.AccountingPeriod.Month
 
                       createExcelAndPdfInvoice outputFile invoice
-                    
-                     
+
+
                       use db = new LiteDatabase("simple.db")
                       let invoices = db.GetCollection<Dto.Invoice>("invoices")
                       let invoice = {invoice with Id = Guid.NewGuid()}
@@ -36,7 +36,7 @@ let invoiceApi =
 
               }
       getCustomers =
-          fun () ->              
+          fun () ->
               use db = new LiteDatabase("simple.db")
               let invoices = db.GetCollection<Dto.Invoice>("invoices")
               //let customers = invoices.FindAll().Select(fun f->f.Customer)
@@ -44,23 +44,24 @@ let invoiceApi =
               let custs = invoices.Query().Select(fun i -> i.Customer).ToArray()
                             |> Array.groupBy id
                             |> Array.map (fun x -> fst x)
-                            |> Array.map Dto.fromCustomerDto                           
+                            |> Array.map Dto.fromCustomerDto
                             |> Array.filter (function | Ok _ -> true | _ -> false )
                             |> Array.map (fun (Ok c) -> c)
-              async {                 
+                            |> Array.rev
+              async {
                    return Ok [yield! custs]
               } }
 
 let webApp =
     Remoting.createApi ()
-    |> Remoting.withRouteBuilder Route.builder    
+    |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue invoiceApi
     |> Remoting.buildHttpHandler
 
 let app =
     application {
         url "http://0.0.0.0:8085"
-        use_router webApp        
+        use_router webApp
         memory_cache
         use_static "public"
         use_gzip

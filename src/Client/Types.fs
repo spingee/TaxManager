@@ -16,13 +16,19 @@ module Customer =
         { IdNumber: Validated<uint>
           VatId: Validated<VatId>
           Name: Validated<string>
-          Address: Validated<string>}
+          Address: Validated<string>
+          Note: Validated<string option> }
 
     let toCustomerInput (customer: Customer) =
         { IdNumber = Validated.success (customer.IdNumber.ToString()) customer.IdNumber
           VatId = Validated.success (getVatIdStr customer.VatId) customer.VatId
           Name = Validated.success customer.Name customer.Name
-          Address = Validated.success customer.Address customer.Address }
+          Address = Validated.success customer.Address customer.Address
+          Note =
+              Validated.success
+                  (Option.map id customer.Note
+                   |> Option.defaultValue "")
+                  customer.Note }
 
     let fromCustomerInput custInput =
         optional {
@@ -30,11 +36,21 @@ module Customer =
             let! vatId = custInput.VatId.Parsed
             let! name = custInput.Name.Parsed
             let! address = custInput.Address.Parsed
+            let! note =  custInput.Note.Parsed
+
             return { Customer.IdNumber = idNumber
                      VatId = vatId
                      Name = name
-                     Address = address}
+                     Address = address
+                     Note = note }
         }
+
+    let defaultInput =
+        { IdNumber = Validated.createEmpty ()
+          VatId = Validated.createEmpty ()
+          Name = Validated.createEmpty ()
+          Address = Validated.createEmpty ()
+          Note = Validated.createEmpty () }
 
     let isValid input =
         match fromCustomerInput input with

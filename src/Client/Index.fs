@@ -22,6 +22,7 @@ let navBrand =
 
 let createCustomerModal model (dispatch: Msg -> unit) =
     Modal.modal [ Modal.IsActive model.CreatingCustomer ] [
+        let custInput = model.CustomerInput
         Modal.background [] []
         Modal.Card.card [] [
             Modal.Card.head [] [
@@ -34,7 +35,10 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Name" ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch) ]
+                        Input.text [
+                            Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch)
+                            Input.DefaultValue custInput.Name.Raw
+                        ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
@@ -42,26 +46,44 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         Label.label [] [
                             str "Identification number"
                         ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch) ]
+                        Input.text [
+                            Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch)
+                            Input.DefaultValue custInput.IdNumber.Raw
+                            ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "VAT Id" ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch) ]
+                        Input.text [
+                             Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch)
+                             Input.DefaultValue custInput.VatId.Raw
+                        ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Address" ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch) ]
+                        Input.text [
+                            Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch)
+                            Input.DefaultValue custInput.Address.Raw
+                        ]
+                    ]
+                ]
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "Note" ]
+                        Textarea.textarea [
+                            Textarea.OnChange(fun x -> SetCustomerNote x.Value |> dispatch)
+                            Textarea.DefaultValue custInput.Note.Raw
+                        ][]
                     ]
                 ]
             ]
             Modal.Card.foot [] [
                 Button.button [ Button.Color IsSuccess
                                 Button.Disabled
-                                <| not (Customer.isValid model.CustomerInput)
+                                <| not (Customer.isValid custInput)
                                 Button.OnClick(fun _ -> dispatch <| EndCreateCustomer true) ] [
                     str "Create"
                 ]

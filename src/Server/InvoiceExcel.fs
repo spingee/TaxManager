@@ -48,5 +48,9 @@ let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice =
     ws.Cells.["C10"].Value <- invoice.Customer.Name
     ws.Cells.["D7"].Value <- invoice.Customer.IdNumber
     ws.Cells.["D8"].Value <- getVatIdStr invoice.Customer.VatId
+    match invoice.Customer.Note with
+    | Some v -> ws.Cells.["C13"].Value <- v
+    | None ->ws.Cells.["C13"].Value <- null
+
     workbook.Save(sprintf "%s.xlsx" destFileWithoutExtension)
     workbook.Save(sprintf "%s.pdf" destFileWithoutExtension)

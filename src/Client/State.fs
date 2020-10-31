@@ -17,6 +17,7 @@ type Msg =
     | SetCustomerVatId of string
     | SetCustomerName of string
     | SetCustomerAddress of string
+    | SetCustomerNote of string
     | SelectCustomer of string
     | BeginCreateCustomer
     | EndCreateCustomer of bool
@@ -36,11 +37,7 @@ let init (): Model * Cmd<Msg> =
               { Rate = Validated.success "6000" <| uint16 6000
                 ManDays = Validated.success "20" 20uy
                 AccountingPeriod = DateTime.Now.AddMonths(-1) }
-          CustomerInput =
-              { IdNumber = Validated.createEmpty ()
-                VatId = Validated.createEmpty ()
-                Name = Validated.createEmpty ()
-                Address = Validated.createEmpty() }
+          CustomerInput = Customer.defaultInput
           Title = "Submit invoice data"
           Result = None
           IsLoading = true
@@ -153,33 +150,60 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | true -> Validated.failure v
 
         { model with
-              CustomerInput = { model.CustomerInput with Address = address } },
+              CustomerInput =
+                  { model.CustomerInput with
+                        Address = address } },
+        Cmd.none
+    | SetCustomerNote v ->
+        let note =
+            match String.IsNullOrEmpty(v) with
+            | true -> Validated.success "" None
+            | false -> Validated.success v <| Some v
+
+        { model with
+              CustomerInput = { model.CustomerInput with Note = note } },
         Cmd.none
     | HandleException exn ->
         { model with
               IsLoading = false
               Result = Some(Error exn.Message) },
         Cmd.none
-    | BeginCreateCustomer -> { model with CreatingCustomer = true }, Cmd.none
+    | BeginCreateCustomer ->
+        { model with
+              CreatingCustomer = true
+              CustomerInput =
+                  Option.map (fun ci -> Customer.toCustomerInput ci) model.SelectedCustomer
+                  |> Option.defaultValue Customer.defaultInput },
+        Cmd.none
     | EndCreateCustomer true ->
         let cust =
             Customer.fromCustomerInput model.CustomerInput
+
         let model = { model with CreatingCustomer = false }
         match cust with
         | Some c ->
-            { model with
-                  Customers = c :: model.Customers
-                  SelectedCustomer = cust },
-            Cmd.none
+            let existing =
+                model.Customers |> List.tryFind (fun e -> c = e)
+
+            match existing with
+            | Some _ -> { model with SelectedCustomer = Some c }, Cmd.none
+            | None ->
+                { model with
+                      Customers = c :: model.Customers
+                      SelectedCustomer = cust },
+                Cmd.none
         | None -> model, Cmd.none
     | EndCreateCustomer false -> { model with CreatingCustomer = false }, Cmd.none
     | SelectCustomer str ->
 
         let model =
             if not (String.IsNullOrWhiteSpace str) then
-                { model with SelectedCustomer = Some model.Customers.[(int str)] }
-            else { model with SelectedCustomer = None }
-        model,Cmd.none
+                { model with
+                      SelectedCustomer = Some model.Customers.[(int str)] }
+            else
+                { model with SelectedCustomer = None }
+
+        model, Cmd.none
     | LoadCustomers result ->
         { model with
               Customers =
