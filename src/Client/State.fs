@@ -121,19 +121,17 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                         IdNumber = idNumber } },
         Cmd.none
     | SetCustomerVatId v ->
-        let model' =
-            result {
-                let! vatId = createVatId v
+        let model =
+            { model with
+                  CustomerInput =
+                      { model.CustomerInput with
+                            VatId =
+                                createVatId v
+                                |> function
+                                | Ok x -> Validated.success v x
+                                | Error _ -> Validated.failure v } }
 
-                return { model with
-                             CustomerInput =
-                                 { model.CustomerInput with
-                                       VatId = Validated.success v vatId } }
-            }
-
-        match model' with
-        | Ok m -> m, Cmd.none
-        | _ -> model, Cmd.none
+        model, Cmd.none
     | SetCustomerName v ->
         let name =
             match String.IsNullOrEmpty(v) with
@@ -169,11 +167,14 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Result = Some(Error exn.Message) },
         Cmd.none
     | BeginCreateCustomer ->
+        let input =
+            model.SelectedCustomer
+            |> Option.map (fun ci -> Customer.toCustomerInput ci)
+            |> Option.defaultValue Customer.defaultInput
         { model with
               CreatingCustomer = true
-              CustomerInput =
-                  Option.map (fun ci -> Customer.toCustomerInput ci) model.SelectedCustomer
-                  |> Option.defaultValue Customer.defaultInput },
+              CustomerInput =input
+        },
         Cmd.none
     | EndCreateCustomer true ->
         let cust =

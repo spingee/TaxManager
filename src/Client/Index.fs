@@ -37,7 +37,7 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         Label.label [] [ str "Name" ]
                         Input.text [
                             Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch)
-                            Input.DefaultValue custInput.Name.Raw
+                            Input.Value custInput.Name.Raw
                         ]
                     ]
                 ]
@@ -48,7 +48,7 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         ]
                         Input.text [
                             Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch)
-                            Input.DefaultValue custInput.IdNumber.Raw
+                            Input.Value custInput.IdNumber.Raw
                             ]
                     ]
                 ]
@@ -57,7 +57,7 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         Label.label [] [ str "VAT Id" ]
                         Input.text [
                              Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch)
-                             Input.DefaultValue custInput.VatId.Raw
+                             Input.Value custInput.VatId.Raw
                         ]
                     ]
                 ]
@@ -66,7 +66,7 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         Label.label [] [ str "Address" ]
                         Input.text [
                             Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch)
-                            Input.DefaultValue custInput.Address.Raw
+                            Input.Value custInput.Address.Raw
                         ]
                     ]
                 ]
@@ -75,7 +75,7 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         Label.label [] [ str "Note" ]
                         Textarea.textarea [
                             Textarea.OnChange(fun x -> SetCustomerNote x.Value |> dispatch)
-                            Textarea.DefaultValue custInput.Note.Raw
+                            Textarea.Value custInput.Note.Raw
                         ][]
                     ]
                 ]

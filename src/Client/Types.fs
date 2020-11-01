@@ -3,6 +3,7 @@ module Types
 open Shared.Invoice
 open System
 open Shared.Option
+open Utils
 
 type Validated<'t> = { Raw: string; Parsed: Option<'t> }
 
