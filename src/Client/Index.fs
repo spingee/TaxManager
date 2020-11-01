@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open State
 open Types
 open Fable.FontAwesome
+open Utils
 
 let monthSelectPlugin (x: obj): obj -> obj =
     importDefault "flatpickr/dist/plugins/monthSelect"
@@ -35,10 +36,8 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Name" ]
-                        Input.text [
-                            Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch)
-                            Input.Value custInput.Name.Raw
-                        ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch)
+                                     Input.Value custInput.Name.Raw ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
@@ -46,37 +45,29 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                         Label.label [] [
                             str "Identification number"
                         ]
-                        Input.text [
-                            Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch)
-                            Input.Value custInput.IdNumber.Raw
-                            ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch)
+                                     Input.Value custInput.IdNumber.Raw ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "VAT Id" ]
-                        Input.text [
-                             Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch)
-                             Input.Value custInput.VatId.Raw
-                        ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch)
+                                     Input.Value custInput.VatId.Raw ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Address" ]
-                        Input.text [
-                            Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch)
-                            Input.Value custInput.Address.Raw
-                        ]
+                        Input.text [ Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch)
+                                     Input.Value custInput.Address.Raw ]
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Note" ]
-                        Textarea.textarea [
-                            Textarea.OnChange(fun x -> SetCustomerNote x.Value |> dispatch)
-                            Textarea.Value custInput.Note.Raw
-                        ][]
+                        Textarea.textarea [ Textarea.OnChange(fun x -> SetCustomerNote x.Value |> dispatch)
+                                            Textarea.Value custInput.Note.Raw ] []
                     ]
                 ]
             ]
@@ -142,15 +133,22 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                 Label.label [] [ str "Customer" ]
                 Field.p [ Field.HasAddons ] [
                     Control.div [ Control.IsExpanded ] [
-                        Select.select [ Select.IsFullWidth ] [
+                        Select.select [ Select.IsFullWidth
+                                        Select.IsLoading(model.Customers = InProgress) ] [
                             select [ OnChange(fun e -> dispatch <| SelectCustomer e.Value) ] [
-                                match model.SelectedCustomer with | None -> yield option [ Value("") ] [ str "" ] | _-> ()
-                                for i = 0 to model.Customers.Length - 1 do
-                                    let c = model.Customers.[i]
-                                    yield option [ Value(i)
-                                                   Selected(model.SelectedCustomer = Some c) ] [
-                                              str <| sprintf "%s (%i)" c.Name c.IdNumber
-                                          ]
+                                match model.SelectedCustomer with
+                                | None -> yield option [ Value("") ] [ str "" ]
+                                | _ -> ()
+                                match model.Customers with
+                                | Resolved custs ->
+                                    for i = 0 to custs.Length - 1 do
+                                        let c = custs.[i]
+                                        yield
+                                            option [ Value(i)
+                                                     Selected(model.SelectedCustomer = Some c) ] [
+                                                str <| sprintf "%s (%i)" c.Name c.IdNumber
+                                            ]
+                                | _ -> ()
                             ]
                         ]
                     ]
@@ -181,9 +179,8 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
 let view (model: Model) (dispatch: Msg -> unit) =
     Hero.hero [ Hero.Color IsPrimary
                 Hero.IsFullHeight
-                Hero.Props
-                    [ Style [ Background """url("kid2.png") no-repeat center center fixed"""
-                              BackgroundSize "cover" ] ] ] [
+                Hero.Props [ Style [ Background """url("kid2.png") no-repeat center center fixed"""
+                                     BackgroundSize "cover" ] ] ] [
         Hero.head [] [
             Navbar.navbar [] [
                 Container.container [] [ navBrand ]
@@ -210,8 +207,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                      | Error s -> s)
                             ]
                         | None _ ->
-                            Notification.notification [ Notification.Modifiers
-                                                            [ Modifier.IsInvisible(Screen.All, true) ] ] []
+                            Notification.notification [ Notification.Modifiers [ Modifier.IsInvisible(Screen.All, true) ] ] []
                     ]
                 ]
             ]

@@ -79,7 +79,7 @@ type Model =
       Result: Result<string, string> option
       IsLoading: bool
       CreatingCustomer: bool
-      Customers: Customer list
+      Customers: Deferred<Customer list>
       SelectedCustomer: Customer option }
 
 let isModelValid model =

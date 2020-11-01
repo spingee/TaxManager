@@ -1,12 +1,15 @@
-namespace Utils
-
+module Utils
+open System
 type Deferred<'t> =
     | HasNotStartedYet
     | InProgress
     | Resolved of 't
 
+let exceptionToResult (ex:#Exception) =
+    Error ex.Message
+
 [<RequireQualifiedAccess>]
-module Deffered =
+module Deferred =
 
     let resolved =
         function

@@ -6,6 +6,7 @@ open Shared
 open Shared.Invoice
 open System
 open Types
+open Utils
 
 type Msg =
     | AddInvoice
@@ -32,6 +33,8 @@ let invoiceApi =
 
 
 let init (): Model * Cmd<Msg> =
+    let cmd =
+        Cmd.OfAsync.either invoiceApi.getCustomers () LoadCustomers (exceptionToResult >> LoadCustomers)
     let model =
         { InvoiceInput =
               { Rate = Validated.success "6000" <| uint16 6000
@@ -40,13 +43,12 @@ let init (): Model * Cmd<Msg> =
           CustomerInput = Customer.defaultInput
           Title = "Submit invoice data"
           Result = None
-          IsLoading = true
+          IsLoading = false
           CreatingCustomer = false
-          Customers = []
+          Customers = InProgress
           SelectedCustomer = None }
 
-    let cmd =
-        Cmd.OfAsync.either invoiceApi.getCustomers () LoadCustomers HandleException
+
 
     model, cmd
 
@@ -171,46 +173,44 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             model.SelectedCustomer
             |> Option.map (fun ci -> Customer.toCustomerInput ci)
             |> Option.defaultValue Customer.defaultInput
+
         { model with
               CreatingCustomer = true
-              CustomerInput =input
-        },
+              CustomerInput = input },
         Cmd.none
     | EndCreateCustomer true ->
         let cust =
             Customer.fromCustomerInput model.CustomerInput
 
         let model = { model with CreatingCustomer = false }
-        match cust with
-        | Some c ->
-            let existing =
-                model.Customers |> List.tryFind (fun e -> c = e)
+        match cust, model.Customers with
+        | Some c, Resolved custs ->
+            let existing = custs |> List.tryFind (fun e -> c = e)
 
             match existing with
             | Some _ -> { model with SelectedCustomer = Some c }, Cmd.none
             | None ->
                 { model with
-                      Customers = c :: model.Customers
+                      Customers = Resolved <| c :: custs
                       SelectedCustomer = cust },
                 Cmd.none
-        | None -> model, Cmd.none
+        | _, _ -> model, Cmd.none
     | EndCreateCustomer false -> { model with CreatingCustomer = false }, Cmd.none
     | SelectCustomer str ->
-
         let model =
-            if not (String.IsNullOrWhiteSpace str) then
+            match model.Customers, (String.IsNullOrWhiteSpace str) with
+            | Resolved custs, false ->
                 { model with
-                      SelectedCustomer = Some model.Customers.[(int str)] }
-            else
-                { model with SelectedCustomer = None }
+                      SelectedCustomer = Some custs.[(int str)] }
+            | _, _ -> { model with SelectedCustomer = None }
 
         model, Cmd.none
     | LoadCustomers result ->
         { model with
               Customers =
                   match result with
-                  | Ok cs -> cs
-                  | Error _ -> []
+                  | Ok cs -> Resolved cs
+                  | Error _ -> Resolved []
               SelectedCustomer =
                   match result with
                   | Ok cs when cs.Length > 0 -> Some cs.Head
