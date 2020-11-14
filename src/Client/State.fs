@@ -24,6 +24,7 @@ type Msg =
     | EndCreateCustomer of bool
     | HandleException of Exception
     | LoadCustomers of AsyncOperationStatus<Result<Customer list, string>>
+    | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
 
 let invoiceApi =
     Remoting.createApi ()
@@ -33,7 +34,9 @@ let invoiceApi =
 
 
 let init (): Model * Cmd<Msg> =
-    let cmd = Cmd.ofMsg (LoadCustomers Started)
+    let cmd =
+        Cmd.batch [ Cmd.ofMsg (LoadCustomers Started)
+                    Cmd.ofMsg (LoadInvoices Started) ]
 
     let model =
         { InvoiceInput =
@@ -46,7 +49,8 @@ let init (): Model * Cmd<Msg> =
           IsLoading = false
           CreatingCustomer = false
           Customers = HasNotStartedYet
-          SelectedCustomer = None }
+          SelectedCustomer = None
+          Invoices = HasNotStartedYet }
 
 
 
@@ -80,7 +84,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             let model =
                 { model with
                       IsLoading = true
-                      Result = None }
+                      Result = None
+                      Invoices =  model.Invoices |> Deferred.map (fun x -> inv::x) }
 
             let cmd =
                 Cmd.OfAsync.either invoiceApi.addInvoice inv AddedInvoice HandleException
@@ -222,6 +227,25 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   match result with
                   | Ok cs when cs.Length > 0 -> Some cs.Head
                   | _ -> None
+              Result =
+                  match result with
+                  | Ok _ -> None
+                  | Error s -> Some(Error s) },
+        Cmd.none
+
+    | LoadInvoices Started ->
+        { model with Customers = InProgress },
+        Cmd.OfAsync.either
+            invoiceApi.getInvoices
+            ()
+            (Finished >> LoadInvoices)
+            (exceptionToResult >> Finished >> LoadInvoices)
+    | LoadInvoices (Finished result) ->
+        { model with
+              Invoices =
+                  match result with
+                  | Ok i -> Resolved i
+                  | Error _ -> Resolved []
               Result =
                   match result with
                   | Ok _ -> None

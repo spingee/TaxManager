@@ -20,6 +20,37 @@ let navBrand =
         ]
     ]
 
+let invoicesTable model =
+    Table.table [] [
+        thead [] [
+            tr [] [
+                th [] [ str "Period" ]
+                th [] [ str "Rate" ]
+                th [] [ str "Man Days" ]
+                th [] [ str "Customer" ]
+            ]
+        ]
+        tbody [] [
+            yield!
+                model.Invoices
+                |> Deferred.map (fun invs ->
+                    invs
+                    |> List.sortByDescending (fun x -> x.AccountingPeriod)
+                    |> List.map (fun i ->
+                        tr [] [
+                            td [] [
+                                str
+                                <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
+                            ]
+                            td [] [ str <| i.Rate.ToString() ]
+                            td [] [ str <| i.ManDays.ToString() ]
+                            td [] [
+                                str <| i.Customer.Name.ToString()
+                            ]
+                        ]))
+                |> Deferred.defaultResolved []
+        ]
+    ]
 
 let createCustomerModal model (dispatch: Msg -> unit) =
     Modal.modal [ Modal.IsActive model.CreatingCustomer ] [
@@ -208,6 +239,9 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             ]
                         | None _ ->
                             Notification.notification [ Notification.Modifiers [ Modifier.IsInvisible(Screen.All, true) ] ] []
+                    ]
+                    Column.column [ Column.Width(Screen.All, Column.IsOneThird) ] [
+                        invoicesTable model
                     ]
                 ]
             ]

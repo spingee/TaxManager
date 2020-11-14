@@ -80,7 +80,8 @@ type Model =
       IsLoading: bool
       CreatingCustomer: bool
       Customers: Deferred<Customer list>
-      SelectedCustomer: Customer option }
+      SelectedCustomer: Customer option
+      Invoices: Deferred<Invoice list> }
 
 let isModelValid model =
     Invoice.isValid model.InvoiceInput

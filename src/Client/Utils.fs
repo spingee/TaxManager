@@ -41,3 +41,9 @@ module Deferred =
         | HasNotStartedYet -> false
         | InProgress -> false
         | Resolved value -> predicate value
+
+    let defaultResolved defaultValue (deferred: Deferred<'T>): 'T =
+        match deferred with
+        | HasNotStartedYet -> defaultValue
+        | InProgress -> defaultValue
+        | Resolved value -> value
