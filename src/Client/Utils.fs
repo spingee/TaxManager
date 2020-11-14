@@ -5,6 +5,10 @@ type Deferred<'t> =
     | InProgress
     | Resolved of 't
 
+type AsyncOperationStatus<'t> =
+    | Started
+    | Finished of 't
+
 let exceptionToResult (ex:#Exception) =
     Error ex.Message
 

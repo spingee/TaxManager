@@ -24,7 +24,7 @@ module Invoice =
           VatId: VatId
           Name: string
           Address: string
-          Note: string option}
+          Note: string option }
 
     type Invoice =
         { Id: Guid
@@ -35,9 +35,9 @@ module Invoice =
 
     type IInvoiceApi =
         { addInvoice: Invoice -> Async<Result<string, string>>
-          getCustomers: unit -> Async<Result<Customer list, string>> }
+          getCustomers: unit -> Async<Result<Customer list, string>>
+          getInvoices: unit -> Async<Result<Invoice list, string>> }
 
 
 module Route =
     let builder typeName methodName = sprintf "/api/%s/%s" typeName methodName
-

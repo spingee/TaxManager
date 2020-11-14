@@ -18,7 +18,7 @@ let invoiceApi =
                   try
                       let outputFile =
                           sprintf
-                              "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01.xlsx"
+                              "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01"
                               invoice.AccountingPeriod.Year
                               invoice.AccountingPeriod.Month
 
@@ -26,9 +26,14 @@ let invoiceApi =
 
 
                       use db = new LiteDatabase("simple.db")
-                      let invoices = db.GetCollection<Dto.Invoice>("invoices")
-                      let invoice = {invoice with Id = Guid.NewGuid()}
-                                    |> Dto.toInvoiceDto
+
+                      let invoices =
+                          db.GetCollection<Dto.Invoice>("invoices")
+
+                      let invoice =
+                          { invoice with Id = Guid.NewGuid() }
+                          |> Dto.toInvoiceDto
+
                       invoices.Insert(invoice) |> ignore
 
                       return Ok "Success"
@@ -38,19 +43,36 @@ let invoiceApi =
       getCustomers =
           fun () ->
               use db = new LiteDatabase("simple.db")
-              let invoices = db.GetCollection<Dto.Invoice>("invoices")
+
+              let invoices =
+                  db.GetCollection<Dto.Invoice>("invoices")
               //let customers = invoices.FindAll().Select(fun f->f.Customer)
               // BsonExpression.Create("group by") // todo
-              let custs = invoices.Query().Select(fun i -> i.Customer).ToArray()
-                            |> Array.groupBy id
-                            |> Array.map (fun x -> fst x)
-                            |> Array.map Dto.fromCustomerDto
-                            |> Array.filter (function | Ok _ -> true | _ -> false )
-                            |> Array.map (fun (Ok c) -> c)
-                            |> Array.rev
+              let custs =
+                  invoices.Query().Select(fun i -> i.Customer).ToArray()
+                  |> Array.groupBy id
+                  |> Array.map fst
+                  |> Array.map Dto.fromCustomerDto
+                  |> Array.filter (function
+                      | Ok _ -> true
+                      | _ -> false)
+                  |> Array.map (fun (Ok c) -> c)
+                  |> Array.rev
+
+              async { return Ok [ yield! custs ] }
+      getInvoices =
+          fun () ->
+
+
               async {
-                   return Ok [yield! custs]
-              } }
+                  use db = new LiteDatabase("simple.db")
+
+                  let invoices =
+                    db.GetCollection<Dto.Invoice>("invoices").FindAll()
+                    |> Seq.map Dto.fromInvoiceDto
+                    |> Seq.map (fun (Ok c) -> c)
+                    |> List.ofSeq
+                  return Ok invoices } }
 
 let webApp =
     Remoting.createApi ()

@@ -23,7 +23,7 @@ type Msg =
     | BeginCreateCustomer
     | EndCreateCustomer of bool
     | HandleException of Exception
-    | LoadCustomers of Result<Customer list, string>
+    | LoadCustomers of AsyncOperationStatus<Result<Customer list, string>>
 
 let invoiceApi =
     Remoting.createApi ()
@@ -33,8 +33,8 @@ let invoiceApi =
 
 
 let init (): Model * Cmd<Msg> =
-    let cmd =
-        Cmd.OfAsync.either invoiceApi.getCustomers () LoadCustomers (exceptionToResult >> LoadCustomers)
+    let cmd = Cmd.ofMsg (LoadCustomers Started)
+
     let model =
         { InvoiceInput =
               { Rate = Validated.success "6000" <| uint16 6000
@@ -45,7 +45,7 @@ let init (): Model * Cmd<Msg> =
           Result = None
           IsLoading = false
           CreatingCustomer = false
-          Customers = InProgress
+          Customers = HasNotStartedYet
           SelectedCustomer = None }
 
 
@@ -205,7 +205,14 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | _, _ -> { model with SelectedCustomer = None }
 
         model, Cmd.none
-    | LoadCustomers result ->
+    | LoadCustomers Started ->
+        { model with Customers = InProgress },
+        Cmd.OfAsync.either
+            invoiceApi.getCustomers
+            ()
+            (Finished >> LoadCustomers)
+            (exceptionToResult >> Finished >> LoadCustomers)
+    | LoadCustomers (Finished result) ->
         { model with
               Customers =
                   match result with
@@ -218,6 +225,5 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Result =
                   match result with
                   | Ok _ -> None
-                  | Error s -> Some(Error s)
-              IsLoading = false },
+                  | Error s -> Some(Error s) },
         Cmd.none
