@@ -25,7 +25,7 @@ let invoiceApi =
                       createExcelAndPdfInvoice outputFile invoice
 
 
-                      use db = new LiteDatabase("simple.db")
+                      use db = new LiteDatabase("FileName=simple.db;Connection=shared")
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -42,37 +42,45 @@ let invoiceApi =
               }
       getCustomers =
           fun () ->
-              use db = new LiteDatabase("simple.db")
+              async {
+                  try
+                      use db = new LiteDatabase("FileName=simple.db;Connection=shared")
 
-              let invoices =
-                  db.GetCollection<Dto.Invoice>("invoices")
-              //let customers = invoices.FindAll().Select(fun f->f.Customer)
-              // BsonExpression.Create("group by") // todo
-              let custs =
-                  invoices.Query().Select(fun i -> i.Customer).ToArray()
-                  |> Array.groupBy id
-                  |> Array.map fst
-                  |> Array.map Dto.fromCustomerDto
-                  |> Array.filter (function
-                      | Ok _ -> true
-                      | _ -> false)
-                  |> Array.map (fun (Ok c) -> c)
-                  |> Array.rev
+                      let invoices =
+                          db.GetCollection<Dto.Invoice>("invoices")
+                      //let customers = invoices.FindAll().Select(fun f->f.Customer)
+                      // BsonExpression.Create("group by") // todo
+                      let custs =
+                          invoices.Query().Select(fun i -> i.Customer).ToArray()
+                          |> Array.groupBy id
+                          |> Array.map fst
+                          |> Array.map Dto.fromCustomerDto
+                          |> Array.filter (function
+                              | Ok _ -> true
+                              | _ -> false)
+                          |> Array.map (fun (Ok c) -> c)
+                          |> Array.rev
 
-              async { return Ok [ yield! custs ] }
+                      return Ok [ yield! custs ]
+                  with e -> return Error e.Message
+
+              }
       getInvoices =
           fun () ->
-
-
               async {
-                  use db = new LiteDatabase("simple.db")
+                  try
+                      use db = new LiteDatabase("FileName=simple.db;Connection=shared")
 
-                  let invoices =
-                    db.GetCollection<Dto.Invoice>("invoices").FindAll()
-                    |> Seq.map Dto.fromInvoiceDto
-                    |> Seq.map (fun (Ok c) -> c)
-                    |> List.ofSeq
-                  return Ok invoices } }
+                      let invoices =
+                          db.GetCollection<Dto.Invoice>("invoices").FindAll()
+                          |> Seq.map Dto.fromInvoiceDto
+                          |> Seq.map (fun (Ok c) -> c)
+                          |> List.ofSeq
+
+                      return Ok invoices
+                  with e -> return Error e.Message
+
+              } }
 
 let webApp =
     Remoting.createApi ()
