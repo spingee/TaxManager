@@ -25,7 +25,8 @@ let invoiceApi =
                       createExcelAndPdfInvoice outputFile invoice
 
 
-                      use db = new LiteDatabase("FileName=simple.db;Connection=shared")
+                      use db =
+                          new LiteDatabase("FileName=simple.db;Connection=shared")
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -44,7 +45,8 @@ let invoiceApi =
           fun () ->
               async {
                   try
-                      use db = new LiteDatabase("FileName=simple.db;Connection=shared")
+                      use db =
+                          new LiteDatabase("FileName=simple.db;Connection=shared")
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -55,10 +57,10 @@ let invoiceApi =
                           |> Array.groupBy id
                           |> Array.map fst
                           |> Array.map Dto.fromCustomerDto
-                          |> Array.filter (function
-                              | Ok _ -> true
-                              | _ -> false)
-                          |> Array.map (fun (Ok c) -> c)
+                          |> Array.map (function
+                              | Ok c -> Some c
+                              | _ -> None)
+                          |> Array.choose id
                           |> Array.rev
 
                       return Ok [ yield! custs ]
@@ -69,15 +71,35 @@ let invoiceApi =
           fun () ->
               async {
                   try
-                      use db = new LiteDatabase("FileName=simple.db;Connection=shared")
+                      use db =
+                          new LiteDatabase("FileName=simple.db;Connection=shared")
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices").FindAll()
                           |> Seq.map Dto.fromInvoiceDto
-                          |> Seq.map (fun (Ok c) -> c)
+                          |> Seq.map (function
+                              | Ok c -> Some c
+                              | _ -> None)
+                          |> Seq.choose id
                           |> List.ofSeq
 
                       return Ok invoices
+                  with e -> return Error e.Message
+
+              }
+      removeInvoice =
+          fun id ->
+              async {
+                  try
+                      use db =
+                          new LiteDatabase("FileName=simple.db;Connection=shared")
+
+                      let isDeleted =
+                          db.GetCollection<Dto.Invoice>("invoices").Delete(BsonValue(id))
+
+                      if (isDeleted) then return Ok() else return Error "Invoice was not removed."
+
+
                   with e -> return Error e.Message
 
               } }

@@ -37,7 +37,7 @@ module Customer =
             let! vatId = custInput.VatId.Parsed
             let! name = custInput.Name.Parsed
             let! address = custInput.Address.Parsed
-            let! note =  custInput.Note.Parsed
+            let! note = custInput.Note.Parsed
 
             return { Customer.IdNumber = idNumber
                      VatId = vatId
@@ -81,7 +81,8 @@ type Model =
       CreatingCustomer: bool
       Customers: Deferred<Customer list>
       SelectedCustomer: Customer option
-      Invoices: Deferred<Invoice list> }
+      Invoices: Deferred<Invoice list>
+      RemovingInvoice: Invoice option }
 
 let isModelValid model =
     Invoice.isValid model.InvoiceInput

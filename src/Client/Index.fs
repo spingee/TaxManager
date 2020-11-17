@@ -20,7 +20,7 @@ let navBrand =
         ]
     ]
 
-let invoicesTable model =
+let invoicesTable model (dispatch: Msg -> unit) =
     Table.table [] [
         thead [] [
             tr [] [
@@ -28,6 +28,7 @@ let invoicesTable model =
                 th [] [ str "Rate" ]
                 th [] [ str "Man Days" ]
                 th [] [ str "Customer" ]
+                th [] [ str "Action" ]
             ]
         ]
         tbody [] [
@@ -46,6 +47,19 @@ let invoicesTable model =
                             td [] [ str <| i.ManDays.ToString() ]
                             td [] [
                                 str <| i.Customer.Name.ToString()
+                            ]
+                            td [] [
+                                let inProgress =
+                                    model.RemovingInvoice
+                                    |> Option.map (fun ri -> ri = i)
+                                    |> Option.defaultValue false
+
+                                Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
+                                                                   Modifier.IsHidden(Screen.All, inProgress) ]
+                                                Delete.OnClick(fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
+                                Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(Screen.All,not inProgress) ] ] [
+                                    Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
+                                ]
                             ]
                         ]))
                 |> Deferred.defaultResolved []
@@ -240,8 +254,8 @@ let view (model: Model) (dispatch: Msg -> unit) =
                         | None _ ->
                             Notification.notification [ Notification.Modifiers [ Modifier.IsInvisible(Screen.All, true) ] ] []
                     ]
-                    Column.column [ Column.Width(Screen.All, Column.IsOneThird) ] [
-                        invoicesTable model
+                    Column.column [ Column.Width(Screen.All, Column.IsHalf) ] [
+                        invoicesTable model dispatch
                     ]
                 ]
             ]

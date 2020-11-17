@@ -25,6 +25,7 @@ type Msg =
     | HandleException of Exception
     | LoadCustomers of AsyncOperationStatus<Result<Customer list, string>>
     | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
+    | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
 
 let invoiceApi =
     Remoting.createApi ()
@@ -50,7 +51,8 @@ let init (): Model * Cmd<Msg> =
           CreatingCustomer = false
           Customers = HasNotStartedYet
           SelectedCustomer = None
-          Invoices = HasNotStartedYet }
+          Invoices = HasNotStartedYet
+          RemovingInvoice = None }
 
 
 
@@ -85,7 +87,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 { model with
                       IsLoading = true
                       Result = None
-                      Invoices =  model.Invoices |> Deferred.map (fun x -> inv::x) }
+                      Invoices = model.Invoices |> Deferred.map (fun x -> inv :: x) }
 
             let cmd =
                 Cmd.OfAsync.either invoiceApi.addInvoice inv AddedInvoice HandleException
@@ -250,4 +252,19 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   match result with
                   | Ok _ -> None
                   | Error s -> Some(Error s) },
+        Cmd.none
+    | RemoveInvoice (inv, Started) ->
+        { model with
+              RemovingInvoice = Some inv },
+        Cmd.OfAsync.either invoiceApi.removeInvoice inv.Id (fun x -> RemoveInvoice(inv, Finished(Ok()))) (fun x ->
+            RemoveInvoice(inv, Finished(exceptionToResult x)))
+    | RemoveInvoice (inv, Finished result) ->
+        { model with
+              RemovingInvoice = None
+              Invoices =
+                  match result with
+                  | Ok _ ->
+                      (model.Invoices
+                       |> Deferred.map (fun i -> i |> List.filter (fun x -> x <> inv)))
+                  | Error e -> model.Invoices },
         Cmd.none
