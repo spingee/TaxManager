@@ -9,6 +9,7 @@ open Invoice
 open InvoiceExcel
 open GemBox.Spreadsheet
 open LiteDB
+open FsToolkit.ErrorHandling
 //open System.Linq
 
 let invoiceApi =
@@ -52,18 +53,16 @@ let invoiceApi =
                           db.GetCollection<Dto.Invoice>("invoices")
                       //let customers = invoices.FindAll().Select(fun f->f.Customer)
                       // BsonExpression.Create("group by") // todo
-                      let custs =
-                          invoices.Query().Select(fun i -> i.Customer).ToArray()
-                          |> Array.groupBy id
-                          |> Array.map fst
-                          |> Array.map Dto.fromCustomerDto
-                          |> Array.map (function
-                              | Ok c -> Some c
-                              | _ -> None)
-                          |> Array.choose id
-                          |> Array.rev
+                      //   let lol = BsonMapper.Global.GetExpression(fun i -> i.Customer)
+                      //   let troll = invoices.Query().GroupBy(lol).Select(lol).ToArray();
+                      return invoices.Query().Select(fun i -> i.Customer).ToArray()
+                             |> List.ofSeq
+                             |> List.groupBy id
+                             |> List.map fst
+                             |> List.map Dto.fromCustomerDto
+                             |> List.sequenceResultA
+                             |> Result.mapError (fun e -> String.concat ", " e)
 
-                      return Ok [ yield! custs ]
                   with e -> return Error e.Message
 
               }
@@ -74,16 +73,12 @@ let invoiceApi =
                       use db =
                           new LiteDatabase("FileName=simple.db;Connection=shared")
 
-                      let invoices =
-                          db.GetCollection<Dto.Invoice>("invoices").FindAll()
-                          |> Seq.map Dto.fromInvoiceDto
-                          |> Seq.map (function
-                              | Ok c -> Some c
-                              | _ -> None)
-                          |> Seq.choose id
-                          |> List.ofSeq
+                      return db.GetCollection<Dto.Invoice>("invoices").FindAll()
+                             |> Seq.map Dto.fromInvoiceDto
+                             |> List.ofSeq
+                             |> List.sequenceResultM
 
-                      return Ok invoices
+
                   with e -> return Error e.Message
 
               }
@@ -98,8 +93,6 @@ let invoiceApi =
                           db.GetCollection<Dto.Invoice>("invoices").Delete(BsonValue(id))
 
                       if (isDeleted) then return Ok() else return Error "Invoice was not removed."
-
-
                   with e -> return Error e.Message
 
               } }
