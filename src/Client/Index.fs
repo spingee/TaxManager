@@ -21,51 +21,52 @@ let navBrand =
     ]
 
 let invoicesTable model (dispatch: Msg -> unit) =
-    Table.table [] [
-        thead [] [
-            tr [] [
-                th [] [ str "Period" ]
-                th [] [ str "Rate" ]
-                th [] [ str "Man Days" ]
-                th [] [ str "Customer" ]
-                th [] [ str "Action" ]
+    Box.box' [][
+        Table.table [] [
+            thead [] [
+                tr [] [
+                    th [] [ str "Period" ]
+                    th [] [ str "Rate" ]
+                    th [] [ str "Man Days" ]
+                    th [] [ str "Customer" ]
+                    th [] [ str "Action" ]
+                ]
+            ]
+            tbody [] [
+                yield!
+                    model.Invoices
+                    |> Deferred.map (fun invs ->
+                        invs
+                        |> List.sortByDescending (fun x -> x.AccountingPeriod)
+                        |> List.map (fun i ->
+                            tr [] [
+                                td [] [
+                                    str
+                                    <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
+                                ]
+                                td [] [ str <| i.Rate.ToString() ]
+                                td [] [ str <| i.ManDays.ToString() ]
+                                td [] [
+                                    str <| i.Customer.Name.ToString()
+                                ]
+                                td [] [
+                                    let inProgress =
+                                        model.RemovingInvoice
+                                        |> Option.map (fun ri -> ri = i)
+                                        |> Option.defaultValue false
+
+                                    Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
+                                                                       Modifier.IsHidden(Screen.All, inProgress) ]
+                                                    Delete.OnClick(fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
+                                    Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(Screen.All,not inProgress) ] ] [
+                                        Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
+                                    ]
+                                ]
+                            ]))
+                    |> Deferred.defaultResolved []
             ]
         ]
-        tbody [] [
-            yield!
-                model.Invoices
-                |> Deferred.map (fun invs ->
-                    invs
-                    |> List.sortByDescending (fun x -> x.AccountingPeriod)
-                    |> List.map (fun i ->
-                        tr [] [
-                            td [] [
-                                str
-                                <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
-                            ]
-                            td [] [ str <| i.Rate.ToString() ]
-                            td [] [ str <| i.ManDays.ToString() ]
-                            td [] [
-                                str <| i.Customer.Name.ToString()
-                            ]
-                            td [] [
-                                let inProgress =
-                                    model.RemovingInvoice
-                                    |> Option.map (fun ri -> ri = i)
-                                    |> Option.defaultValue false
-
-                                Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
-                                                                   Modifier.IsHidden(Screen.All, inProgress) ]
-                                                Delete.OnClick(fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
-                                Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(Screen.All,not inProgress) ] ] [
-                                    Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
-                                ]
-                            ]
-                        ]))
-                |> Deferred.defaultResolved []
-        ]
     ]
-
 let createCustomerModal model (dispatch: Msg -> unit) =
     Modal.modal [ Modal.IsActive model.CreatingCustomer ] [
         let custInput = model.CustomerInput
