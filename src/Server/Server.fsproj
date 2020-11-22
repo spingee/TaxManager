@@ -18,5 +18,8 @@
   <ItemGroup>
     <PackageReference Include="GemBox.Spreadsheet" Version="47.0.1000" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="db\" />
+  </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

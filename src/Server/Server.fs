@@ -12,6 +12,8 @@ open LiteDB
 open FsToolkit.ErrorHandling
 //open System.Linq
 
+let connectionString = @"FileName=./db/taxmanager.db;Connection=shared"
+
 let invoiceApi =
     { addInvoice =
           fun invoice ->
@@ -27,7 +29,7 @@ let invoiceApi =
 
 
                       use db =
-                          new LiteDatabase("FileName=simple.db;Connection=shared")
+                          new LiteDatabase(connectionString)
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -47,7 +49,7 @@ let invoiceApi =
               async {
                   try
                       use db =
-                          new LiteDatabase("FileName=simple.db;Connection=shared")
+                          new LiteDatabase(connectionString)
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -70,7 +72,7 @@ let invoiceApi =
               async {
                   try
                       use db =
-                          new LiteDatabase("FileName=simple.db;Connection=shared")
+                          new LiteDatabase(connectionString)
 
                       return db.GetCollection<Dto.Invoice>("invoices").FindAll()
                              |> List.ofSeq
