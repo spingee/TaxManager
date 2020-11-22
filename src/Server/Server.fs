@@ -59,8 +59,7 @@ let invoiceApi =
                              |> List.ofSeq
                              |> List.groupBy id
                              |> List.map fst
-                             |> List.map Dto.fromCustomerDto
-                             |> List.sequenceResultA
+                             |> List.traverseResultA Dto.fromCustomerDto
                              |> Result.mapError (fun e -> String.concat ", " e)
 
                   with e -> return Error e.Message
@@ -74,11 +73,8 @@ let invoiceApi =
                           new LiteDatabase("FileName=simple.db;Connection=shared")
 
                       return db.GetCollection<Dto.Invoice>("invoices").FindAll()
-                             |> Seq.map Dto.fromInvoiceDto
                              |> List.ofSeq
-                             |> List.sequenceResultM
-
-
+                             |> List.traverseResultM Dto.fromInvoiceDto
                   with e -> return Error e.Message
 
               }

@@ -8,6 +8,7 @@ open Fake.IO
 open Farmer
 open Farmer.Builders
 
+
 Target.initEnvironment ()
 
 let sharedPath = Path.getFullName "./src/Shared"
@@ -15,6 +16,15 @@ let serverPath = Path.getFullName "./src/Server"
 let deployDir = Path.getFullName "./deploy"
 let sharedTestsPath = Path.getFullName "./tests/Shared"
 let serverTestsPath = Path.getFullName "./tests/Server"
+
+let dockerImageName =
+    Environment.environVarOrDefault "DockerImageName" "taxmanager"
+
+let dockerUser =
+    Environment.environVarOrDefault "DockerUser" "spingee"
+// let dockerPassword = Environment.environVarOrDefault "DockerPassword"
+// let dockerLoginServer = Environment.environVarOrDefault "DockerLoginServer"
+
 
 let npm args workingDir =
     let npmPath =
@@ -84,6 +94,14 @@ Target.create "Run" (fun _ ->
     |> Async.RunSynchronously
     |> ignore)
 
+Target.create "CreateDockerImage" (fun _ ->
+    let result =
+        CreateProcess.fromRawCommandLine "docker"
+        <| sprintf "build -t %s/%s ." dockerUser dockerImageName
+        |> Proc.run
+
+    if result.ExitCode <> 0 then failwith "Docker build failed")
+
 Target.create "RunTests" (fun _ ->
     dotnet "build" sharedTestsPath
     [ async { dotnet "watch run" serverTestsPath }
@@ -102,5 +120,7 @@ open Fake.Core.TargetOperators
 "Clean" ==> "InstallClient" ==> "Run"
 
 "Clean" ==> "InstallClient" ==> "RunTests"
+
+"Bundle" ==> "CreateDockerImage"
 
 Target.runOrDefaultWithArguments "Bundle"
