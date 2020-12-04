@@ -7,16 +7,17 @@ open GemBox.Spreadsheet
 open System.IO
 
 
-let private getInvoiceNumber invoice =
-    sprintf "%i%i01" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month
 
-let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice =
+let private getInvoiceNumber invoice indexNumber =
+    sprintf "%i%i%02i" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month indexNumber
+
+let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice indexNumber =
     let path = Path.GetFullPath("InvoiceTemplate.xlsx")
     let workbook = ExcelFile.Load(path)
 
 
     let ws = workbook.Worksheets.[0]
-    let invoiceNumber = getInvoiceNumber invoice
+    let invoiceNumber = getInvoiceNumber invoice indexNumber
 
     let date =
         System.DateTime
@@ -52,5 +53,7 @@ let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice =
     | Some v -> ws.Cells.["C13"].Value <- v
     | None ->ws.Cells.["C13"].Value <- null
 
+    ws.PrintOptions.FitWorksheetWidthToPages <- 1;
+    ws.PrintOptions.FitWorksheetHeightToPages <- 1;
     workbook.Save(sprintf "%s.xlsx" destFileWithoutExtension)
     workbook.Save(sprintf "%s.pdf" destFileWithoutExtension)

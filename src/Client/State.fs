@@ -256,7 +256,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | RemoveInvoice (inv, Started) ->
         { model with
               RemovingInvoice = Some inv },
-        Cmd.OfAsync.either invoiceApi.removeInvoice inv.Id (fun x -> RemoveInvoice(inv, Finished(Ok()))) (fun x ->
+        Cmd.OfAsync.either invoiceApi.removeInvoice inv.Id (fun x -> RemoveInvoice(inv, Finished(x))) (fun x ->
             RemoveInvoice(inv, Finished(exceptionToResult x)))
     | RemoveInvoice (inv, Finished result) ->
         { model with

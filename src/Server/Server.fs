@@ -10,26 +10,45 @@ open InvoiceExcel
 open GemBox.Spreadsheet
 open LiteDB
 open FsToolkit.ErrorHandling
+open System.IO
 //open System.Linq
 
-let connectionString = @"FileName=./db/taxmanager.db;Connection=shared"
+let connectionString =
+    @"FileName=./db/taxmanager.db;Connection=shared"
+#if DEBUG
+let documentOutputDir = @"C:\Users\SpinGee\Desktop"
+#else
+let documentOutputDir = "./output"
+#endif
 
 let invoiceApi =
     { addInvoice =
           fun invoice ->
               async {
                   try
+                      use db = new LiteDatabase(connectionString)
+
+                      let invoices =
+                          db.GetCollection<Dto.Invoice>("invoices")
+                      let samePeriodCount =
+                          invoices.Query()
+                            .Where(fun f -> f.AccountingPeriod = invoice.AccountingPeriod)
+                            .Count();
+                      let indexNumber = samePeriodCount + 1;
+
                       let outputFile =
-                          sprintf
-                              "C:\\Users\\SpinGee\\Desktop\\Faktura - %i-%02i-01"
-                              invoice.AccountingPeriod.Year
-                              invoice.AccountingPeriod.Month
+                          Path.Combine
+                              (documentOutputDir,
+                               sprintf
+                                   "Faktura - %i-%02i-%02i"
+                                   invoice.AccountingPeriod.Year
+                                   invoice.AccountingPeriod.Month
+                                   indexNumber)
 
-                      createExcelAndPdfInvoice outputFile invoice
+                      createExcelAndPdfInvoice outputFile invoice indexNumber
 
 
-                      use db =
-                          new LiteDatabase(connectionString)
+                      use db = new LiteDatabase(connectionString)
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -48,8 +67,7 @@ let invoiceApi =
           fun () ->
               async {
                   try
-                      use db =
-                          new LiteDatabase(connectionString)
+                      use db = new LiteDatabase(connectionString)
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
@@ -71,8 +89,7 @@ let invoiceApi =
           fun () ->
               async {
                   try
-                      use db =
-                          new LiteDatabase(connectionString)
+                      use db = new LiteDatabase(connectionString)
 
                       return db.GetCollection<Dto.Invoice>("invoices").FindAll()
                              |> List.ofSeq
@@ -85,12 +102,12 @@ let invoiceApi =
               async {
                   try
                       use db =
-                          new LiteDatabase("FileName=simple.db;Connection=shared")
+                          new LiteDatabase(connectionString)
 
                       let isDeleted =
                           db.GetCollection<Dto.Invoice>("invoices").Delete(BsonValue(id))
 
-                      if (isDeleted) then return Ok() else return Error "Invoice was not removed."
+                      if (isDeleted) then return Ok() else return Error <| sprintf "Invoice with id %A was not removed." id
                   with e -> return Error e.Message
 
               } }
@@ -111,4 +128,5 @@ let app =
     }
 
 SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
+//FontSettings.FontsBaseDirectory = "./fonts" |> ignore
 run app
