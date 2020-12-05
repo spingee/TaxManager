@@ -142,6 +142,7 @@ NUGET
     Mono.Cecil (0.11.3)
     NETStandard.Library (2.0.3) - restriction: || (== net50) (&& (== netstandard2.0) (>= netcoreapp3.1))
       Microsoft.NETCore.Platforms (>= 1.1)
+    NewId (3.0.2)
     Newtonsoft.Json (12.0.3)
     Pkcs11Interop (5.1.1) - restriction: || (&& (== net50) (< netcoreapp3.1)) (== netstandard2.0)
     Portable.BouncyCastle (1.8.8) - restriction: || (&& (== net50) (< netcoreapp3.1)) (== netstandard2.0)

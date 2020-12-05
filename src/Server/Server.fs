@@ -11,6 +11,7 @@ open GemBox.Spreadsheet
 open LiteDB
 open FsToolkit.ErrorHandling
 open System.IO
+open MassTransit
 //open System.Linq
 
 let connectionString =
@@ -32,7 +33,7 @@ let invoiceApi =
                           db.GetCollection<Dto.Invoice>("invoices")
                       let samePeriodCount =
                           invoices.Query()
-                            .Where(fun f -> f.AccountingPeriod = invoice.AccountingPeriod)
+                            .Where(fun f -> f.AccountingPeriod = invoice.AccountingPeriod.Date)
                             .Count();
                       let indexNumber = samePeriodCount + 1;
 
@@ -54,8 +55,8 @@ let invoiceApi =
                           db.GetCollection<Dto.Invoice>("invoices")
 
                       let invoice =
-                          { invoice with Id = Guid.NewGuid() }
-                          |> Dto.toInvoiceDto
+                          { invoice with Id = NewId.NextGuid() }
+                          |> Dto.toInvoiceDto DateTime.Now
 
                       invoices.Insert(invoice) |> ignore
 
@@ -90,10 +91,11 @@ let invoiceApi =
               async {
                   try
                       use db = new LiteDatabase(connectionString)
-
                       return db.GetCollection<Dto.Invoice>("invoices").FindAll()
                              |> List.ofSeq
+                             |> List.sortByDescending(fun x -> x.AccountingPeriod.Year,x.AccountingPeriod.Month, x.Inserted)
                              |> List.traverseResultM Dto.fromInvoiceDto
+
                   with e -> return Error e.Message
 
               }

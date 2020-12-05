@@ -19,7 +19,8 @@ type Invoice =
       ManDays: uint8
       Rate: uint16
       AccountingPeriod: DateTime
-      Customer: Customer }
+      Customer: Customer
+      Inserted: DateTime }
 
 let fromCustomerDto (dto: Customer) =
     result {
@@ -35,7 +36,7 @@ let fromCustomerDto (dto: Customer) =
         return customer
     }
 
-let toInvoiceDto (invoice: Invoice.Invoice): Invoice =
+let toInvoiceDto inserted (invoice: Invoice.Invoice) : Invoice =
     let customer =
         { IdNumber = invoice.Customer.IdNumber
           VatId = Invoice.getVatIdStr invoice.Customer.VatId
@@ -47,7 +48,8 @@ let toInvoiceDto (invoice: Invoice.Invoice): Invoice =
       ManDays = invoice.ManDays
       Rate = invoice.Rate
       AccountingPeriod = invoice.AccountingPeriod
-      Customer = customer }
+      Customer = customer
+      Inserted = inserted }
 
 let fromInvoiceDto (dto: Invoice) =
     result {
