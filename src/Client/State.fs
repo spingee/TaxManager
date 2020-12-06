@@ -14,6 +14,7 @@ type Msg =
     | SetRate of string
     | SetAccPeriod of DateTime
     | SetMandays of string
+    | SetOrderNumber of string
     | SetCustomerIdNumber of string
     | SetCustomerVatId of string
     | SetCustomerName of string
@@ -43,7 +44,8 @@ let init (): Model * Cmd<Msg> =
         { InvoiceInput =
               { Rate = Validated.success "6000" <| uint16 6000
                 ManDays = Validated.success "20" 20uy
-                AccountingPeriod = DateTime.Today.AddMonths(-1) }
+                AccountingPeriod = DateTime.Today.AddMonths(-1).Date
+                OrderNumber = Some "17Zak00002" }
           CustomerInput = Customer.defaultInput
           Title = "Submit invoice data"
           Result = None
@@ -78,7 +80,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                          Customer = customer
                          Rate = model.InvoiceInput.Rate.Parsed.Value
                          ManDays = model.InvoiceInput.ManDays.Parsed.Value
-                         AccountingPeriod = model.InvoiceInput.AccountingPeriod }
+                         AccountingPeriod = model.InvoiceInput.AccountingPeriod
+                         OrderNumber = model.InvoiceInput.OrderNumber }
             }
 
         match inv with
@@ -117,6 +120,11 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
         { model with
               InvoiceInput = { model.InvoiceInput with ManDays = md } },
+        Cmd.none
+    | SetOrderNumber v ->
+        let orderNumber = if String.IsNullOrWhiteSpace(v) then None else Some v
+        { model with
+              InvoiceInput = { model.InvoiceInput with OrderNumber = orderNumber } },
         Cmd.none
     | SetCustomerIdNumber v ->
         let idNumber =

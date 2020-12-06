@@ -49,6 +49,11 @@ let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice indexNum
     ws.Cells.["C10"].Value <- invoice.Customer.Name
     ws.Cells.["D7"].Value <- invoice.Customer.IdNumber
     ws.Cells.["D8"].Value <- getVatIdStr invoice.Customer.VatId
+    ws.Cells.["B23"].Value <-
+        match invoice.OrderNumber with
+        | Some s -> sprintf "Číslo obj.: %s" s
+        | None -> null
+
     match invoice.Customer.Note with
     | Some v -> ws.Cells.["C13"].Value <- v
     | None ->ws.Cells.["C13"].Value <- null

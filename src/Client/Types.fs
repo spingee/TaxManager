@@ -62,6 +62,7 @@ module Invoice =
     type InvoiceInput =
         { ManDays: Validated<uint8>
           Rate: Validated<uint16>
+          OrderNumber: string option
           AccountingPeriod: DateTime }
 
     let isValid input =

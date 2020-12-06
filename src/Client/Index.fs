@@ -175,6 +175,16 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                                  Input.OnChange(fun x -> SetMandays x.Value |> dispatch) ]
                 ]
             ]
+            Field.div [ Field.IsGrouped ] [
+                Control.p [ Control.IsExpanded ] [
+                    Label.label [] [
+                        str "Order number"
+                    ]
+                    Input.text [ Input.Value(match model.InvoiceInput.OrderNumber with | None -> "" | Some s -> s)
+                                 Input.Placeholder "Order number"
+                                 Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
+                ]
+            ]
             Field.div [ Field.IsExpanded ] [
                 Label.label [] [ str "Customer" ]
                 Field.p [ Field.HasAddons ] [

@@ -31,9 +31,11 @@ let invoiceApi =
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
+                      let dateYear = invoice.AccountingPeriod.Date.Year
+                      let dateMonth = invoice.AccountingPeriod.Date.Month
                       let samePeriodCount =
                           invoices.Query()
-                            .Where(fun f -> f.AccountingPeriod = invoice.AccountingPeriod.Date)
+                            .Where(fun f -> f.AccountingPeriod.Year = dateYear && f.AccountingPeriod.Month = dateMonth )
                             .Count();
                       let indexNumber = samePeriodCount + 1;
 

@@ -31,6 +31,7 @@ module Invoice =
           ManDays: uint8
           Rate: uint16
           AccountingPeriod: DateTime
+          OrderNumber: string option
           Customer: Customer }
 
     type IInvoiceApi =
