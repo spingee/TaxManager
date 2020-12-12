@@ -7,6 +7,7 @@ open Shared.Invoice
 open System
 open Types
 open Utils
+open FsToolkit.ErrorHandling
 
 type Msg =
     | AddInvoice
@@ -45,7 +46,7 @@ let init (): Model * Cmd<Msg> =
               { Rate = Validated.success "6000" <| uint16 6000
                 ManDays = Validated.success "20" 20uy
                 AccountingPeriod = DateTime.Today.AddMonths(-1).Date
-                OrderNumber = Some "17Zak00002" }
+                OrderNumber = Validated.success "17Zak00002" <| Some "17Zak00002" }
           CustomerInput = Customer.defaultInput
           Title = "Submit invoice data"
           Result = None
@@ -61,27 +62,31 @@ let init (): Model * Cmd<Msg> =
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
+    let modelInvoiceInput = model.InvoiceInput
     match msg with
     | AddedInvoice result ->
         { model with
-              Result = Some result
+              Result = match result with | Ok a -> Some (Ok a) | Error s -> Some (Error [s])
               IsLoading = false },
         Cmd.none
     | AddInvoice ->
         let inv =
-            result {
+            validation {
 
                 let! customer =
                     match model.SelectedCustomer with
                     | Some c -> Ok c
                     | None -> Error "No customer selected."
 
+                let! rateParsed = modelInvoiceInput.Rate.Parsed
+                let! manDaysParsed = modelInvoiceInput.ManDays.Parsed
+                let! orderNumber = modelInvoiceInput.OrderNumber.Parsed
                 return { Id = Guid.NewGuid()
                          Customer = customer
-                         Rate = model.InvoiceInput.Rate.Parsed.Value
-                         ManDays = model.InvoiceInput.ManDays.Parsed.Value
-                         AccountingPeriod = model.InvoiceInput.AccountingPeriod
-                         OrderNumber = model.InvoiceInput.OrderNumber }
+                         Rate = rateParsed
+                         ManDays = manDaysParsed
+                         AccountingPeriod = modelInvoiceInput.AccountingPeriod
+                         OrderNumber = orderNumber }
             }
 
         match inv with
@@ -101,36 +106,36 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let rate =
             match UInt16.TryParse v with
             | true, parsed -> Validated.success v parsed
-            | false, _ -> Validated.failure v
+            | false, _ -> Validated.failure v ["Must be whole positive number less than 32768."]
 
         { model with
-              InvoiceInput = { model.InvoiceInput with Rate = rate } },
+              InvoiceInput = { modelInvoiceInput with Rate = rate } },
         Cmd.none
     | SetAccPeriod v ->
         { model with
               InvoiceInput =
-                  { model.InvoiceInput with
+                  { modelInvoiceInput with
                         AccountingPeriod = v } },
         Cmd.none
     | SetMandays v ->
         let md =
             match Byte.TryParse v with
             | true, parsed -> Validated.success v parsed
-            | false, _ -> Validated.failure v
+            | false, _ -> Validated.failure v ["Must be whole number 0-255."]
 
         { model with
-              InvoiceInput = { model.InvoiceInput with ManDays = md } },
+              InvoiceInput = { modelInvoiceInput with ManDays = md } },
         Cmd.none
     | SetOrderNumber v ->
         let orderNumber = if String.IsNullOrWhiteSpace(v) then None else Some v
         { model with
-              InvoiceInput = { model.InvoiceInput with OrderNumber = orderNumber } },
+              InvoiceInput = { modelInvoiceInput with OrderNumber = Validated.success v orderNumber } },
         Cmd.none
     | SetCustomerIdNumber v ->
         let idNumber =
             match UInt32.TryParse v with
             | true, parsed -> Validated.success v parsed
-            | false, _ -> Validated.failure v
+            | false, _ -> Validated.failure v ["Must be whole positive number less than ~4million."]
 
         { model with
               CustomerInput =
@@ -146,14 +151,14 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                                 createVatId v
                                 |> function
                                 | Ok x -> Validated.success v x
-                                | Error _ -> Validated.failure v } }
+                                | Error _ -> Validated.failure v  ["Must be positive number prepended with ISO2 country code."]} }
 
         model, Cmd.none
     | SetCustomerName v ->
         let name =
             match String.IsNullOrEmpty(v) with
             | false -> Validated.success v v
-            | true -> Validated.failure v
+            | true -> Validated.failure v ["Required."]
 
         { model with
               CustomerInput = { model.CustomerInput with Name = name } },
@@ -162,7 +167,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let address =
             match String.IsNullOrEmpty(v) with
             | false -> Validated.success v v
-            | true -> Validated.failure v
+            | true -> Validated.failure v ["Required."]
 
         { model with
               CustomerInput =
@@ -181,7 +186,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | HandleException exn ->
         { model with
               IsLoading = false
-              Result = Some(Error exn.Message) },
+              Result = Some(Error [exn.Message]) },
         Cmd.none
     | BeginCreateCustomer ->
         let input =
@@ -199,7 +204,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
         let model = { model with CreatingCustomer = false }
         match cust, model.Customers with
-        | Some c, Resolved custs ->
+        | Ok c, Resolved custs ->
             let existing = custs |> List.tryFind (fun e -> c = e)
 
             match existing with
@@ -207,7 +212,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | None ->
                 { model with
                       Customers = Resolved <| c :: custs
-                      SelectedCustomer = cust },
+                      SelectedCustomer = Some c },
                 Cmd.none
         | _, _ -> model, Cmd.none
     | EndCreateCustomer false -> { model with CreatingCustomer = false }, Cmd.none
@@ -240,7 +245,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Result =
                   match result with
                   | Ok _ -> None
-                  | Error s -> Some(Error s) },
+                  | Error s -> Some(Error [s]) },
         Cmd.none
 
     | LoadInvoices Started ->
@@ -259,7 +264,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Result =
                   match result with
                   | Ok _ -> None
-                  | Error s -> Some(Error s) },
+                  | Error s -> Some(Error [s]) },
         Cmd.none
     | RemoveInvoice (inv, Started) ->
         { model with

@@ -1,18 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="index.html" />
-    <None Include="paket.references" />
-    <Compile Include="Utils.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="State.fs" />
-    <Compile Include="Index.fs" />
-    <Compile Include="App.fs" />
-  </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\Shared\Shared.fsproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="index.html"/>
+        <None Include="paket.references"/>
+        <Compile Include="Utils.fs"/>
+        <Compile Include="Types.fs"/>
+        <Compile Include="State.fs"/>
+        <Compile Include="Index.fs"/>
+        <Compile Include="App.fs"/>
+    </ItemGroup>
+    <Import Project="..\..\.paket\Paket.Restore.targets"/>
 </Project>

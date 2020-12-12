@@ -2,15 +2,16 @@ module Types
 
 open Shared.Invoice
 open System
-open Shared.Option
 open Utils
+open FsToolkit.ErrorHandling
 
-type Validated<'t> = { Raw: string; Parsed: Option<'t> }
+
+type Validated<'t> = { Raw: string; Parsed: Validation<'t,string> }
 
 module Validated =
-    let createEmpty (): Validated<_> = { Raw = ""; Parsed = None }
-    let success raw value: Validated<_> = { Raw = raw; Parsed = Some value }
-    let failure raw: Validated<_> = { Raw = raw; Parsed = None }
+    let createEmpty (): Validated<_> = { Raw = ""; Parsed = Error [] }
+    let success raw value: Validated<_> = { Raw = raw; Parsed = Ok value }
+    let failure raw errors: Validated<_> = { Raw = raw; Parsed = Error errors }
 
 module Customer =
     type CustomerInput =
@@ -32,7 +33,7 @@ module Customer =
                   customer.Note }
 
     let fromCustomerInput custInput =
-        optional {
+        validation {
             let! idNumber = custInput.IdNumber.Parsed
             let! vatId = custInput.VatId.Parsed
             let! name = custInput.Name.Parsed
@@ -55,21 +56,21 @@ module Customer =
 
     let isValid input =
         match fromCustomerInput input with
-        | Some _ -> true
-        | None -> false
+        | Ok _ -> true
+        | Error _ -> false
 
 module Invoice =
     type InvoiceInput =
         { ManDays: Validated<uint8>
           Rate: Validated<uint16>
-          OrderNumber: string option
+          OrderNumber: Validated<string option>
           AccountingPeriod: DateTime }
 
     let isValid input =
-        let { InvoiceInput.ManDays = mandays; Rate = rate } = input
-        match (mandays.Parsed, rate.Parsed) with
-        | Some _, Some _ -> true
-        | _, _ -> false
+        let { InvoiceInput.ManDays = mandays; Rate = rate; OrderNumber = orderNumber } = input
+        match (mandays.Parsed, rate.Parsed,orderNumber.Parsed) with
+        | Ok _, Ok _,Ok _ -> true
+        | _, _, _ -> false
 
 
 
@@ -77,7 +78,7 @@ type Model =
     { InvoiceInput: Invoice.InvoiceInput
       CustomerInput: Customer.CustomerInput
       Title: string
-      Result: Result<string, string> option
+      Result: Result<string, string list> option
       IsLoading: bool
       CreatingCustomer: bool
       Customers: Deferred<Customer list>

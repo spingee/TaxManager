@@ -31,13 +31,17 @@ let invoiceApi =
 
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
+
                       let dateYear = invoice.AccountingPeriod.Date.Year
                       let dateMonth = invoice.AccountingPeriod.Date.Month
+
                       let samePeriodCount =
                           invoices.Query()
-                            .Where(fun f -> f.AccountingPeriod.Year = dateYear && f.AccountingPeriod.Month = dateMonth )
-                            .Count();
-                      let indexNumber = samePeriodCount + 1;
+                                  .Where(fun f ->
+                                  f.AccountingPeriod.Year = dateYear
+                                  && f.AccountingPeriod.Month = dateMonth).Count()
+
+                      let indexNumber = samePeriodCount + 1
 
                       let outputFile =
                           Path.Combine
@@ -64,7 +68,6 @@ let invoiceApi =
 
                       return Ok "Success"
                   with ex -> return Error <| sprintf "%s" ex.Message
-
               }
       getCustomers =
           fun () ->
@@ -86,7 +89,6 @@ let invoiceApi =
                              |> Result.mapError (fun e -> String.concat ", " e)
 
                   with e -> return Error e.Message
-
               }
       getInvoices =
           fun () ->
@@ -95,25 +97,26 @@ let invoiceApi =
                       use db = new LiteDatabase(connectionString)
                       return db.GetCollection<Dto.Invoice>("invoices").FindAll()
                              |> List.ofSeq
-                             |> List.sortByDescending(fun x -> x.AccountingPeriod.Year,x.AccountingPeriod.Month, x.Inserted)
+                             |> List.sortByDescending (fun x ->
+                                 x.AccountingPeriod.Year, x.AccountingPeriod.Month, x.Inserted)
                              |> List.traverseResultM Dto.fromInvoiceDto
-
                   with e -> return Error e.Message
-
               }
       removeInvoice =
           fun id ->
               async {
                   try
-                      use db =
-                          new LiteDatabase(connectionString)
+                      use db = new LiteDatabase(connectionString)
 
                       let isDeleted =
                           db.GetCollection<Dto.Invoice>("invoices").Delete(BsonValue(id))
 
-                      if (isDeleted) then return Ok() else return Error <| sprintf "Invoice with id %A was not removed." id
+                      if (isDeleted) then
+                          return Ok()
+                      else
+                          return Error
+                                 <| sprintf "Invoice with id %A was not removed." id
                   with e -> return Error e.Message
-
               } }
 
 let webApp =

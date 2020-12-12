@@ -20,8 +20,39 @@ let navBrand =
         ]
     ]
 
+let createTextField label validated (options: Input.Option list)  =
+    Field.div [ Field.IsGrouped ] [
+        Control.p [ Control.IsExpanded ] [
+            Label.label [] [ str label ]
+            Input.text
+                ([ match validated.Parsed with
+                   | Error []
+                   | Ok _ -> ()
+                   | Error _ -> Input.Color IsDanger
+                   Input.Value(validated.Raw)]
+                 @ options)
+            match validated.Parsed with
+            | Error []
+            | Ok _ -> div [] []
+            | Error (e :: _) ->
+                Help.help [ Help.Color IsDanger ] [
+                    str e
+                ]
+        ]
+    ]
+
+let errorHelp validated =
+    match validated.Parsed with
+    | Error []
+    | Ok _ -> div [] []
+    | Error (e :: _) ->
+        Help.help [ Help.Color IsDanger ] [
+            str e
+        ]
+
+
 let invoicesTable model (dispatch: Msg -> unit) =
-    Box.box' [][
+    Box.box' [] [
         Table.table [] [
             thead [] [
                 tr [] [
@@ -33,40 +64,40 @@ let invoicesTable model (dispatch: Msg -> unit) =
                 ]
             ]
             tbody [] [
-                yield!
-                    model.Invoices
-                    |> Deferred.map (fun invs ->
-                        invs
-                        |> List.sortByDescending (fun x -> x.AccountingPeriod)
-                        |> List.map (fun i ->
-                            tr [] [
-                                td [] [
-                                    str
-                                    <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
-                                ]
-                                td [] [ str <| i.Rate.ToString() ]
-                                td [] [ str <| i.ManDays.ToString() ]
-                                td [] [
-                                    str <| i.Customer.Name.ToString()
-                                ]
-                                td [] [
-                                    let inProgress =
-                                        model.RemovingInvoice
-                                        |> Option.map (fun ri -> ri = i)
-                                        |> Option.defaultValue false
+                yield! model.Invoices
+                       |> Deferred.map (fun invs ->
+                           invs
+                           |> List.sortByDescending (fun x -> x.AccountingPeriod)
+                           |> List.map (fun i ->
+                               tr [] [
+                                   td [] [
+                                       str
+                                       <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
+                                   ]
+                                   td [] [ str <| i.Rate.ToString() ]
+                                   td [] [ str <| i.ManDays.ToString() ]
+                                   td [] [
+                                       str <| i.Customer.Name.ToString()
+                                   ]
+                                   td [] [
+                                       let inProgress =
+                                           model.RemovingInvoice
+                                           |> Option.map (fun ri -> ri = i)
+                                           |> Option.defaultValue false
 
-                                    Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
-                                                                       Modifier.IsHidden(Screen.All, inProgress) ]
-                                                    Delete.OnClick(fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
-                                    Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(Screen.All,not inProgress) ] ] [
-                                        Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
-                                    ]
-                                ]
-                            ]))
-                    |> Deferred.defaultResolved []
+                                       Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
+                                                                          Modifier.IsHidden(Screen.All, inProgress) ]
+                                                       Delete.OnClick(fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
+                                       Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(Screen.All, not inProgress) ] ] [
+                                           Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
+                                       ]
+                                   ]
+                               ]))
+                       |> Deferred.defaultResolved []
             ]
         ]
     ]
+
 let createCustomerModal model (dispatch: Msg -> unit) =
     Modal.modal [ Modal.IsActive model.CreatingCustomer ] [
         let custInput = model.CustomerInput
@@ -79,43 +110,22 @@ let createCustomerModal model (dispatch: Msg -> unit) =
                 Delete.delete [ Delete.OnClick(fun _ -> dispatch <| EndCreateCustomer false) ] []
             ]
             Modal.Card.body [] [
-                Field.div [ Field.IsGrouped ] [
-                    Control.p [ Control.IsExpanded ] [
-                        Label.label [] [ str "Name" ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch)
-                                     Input.Value custInput.Name.Raw ]
-                    ]
-                ]
-                Field.div [ Field.IsGrouped ] [
-                    Control.p [ Control.IsExpanded ] [
-                        Label.label [] [
-                            str "Identification number"
-                        ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch)
-                                     Input.Value custInput.IdNumber.Raw ]
-                    ]
-                ]
-                Field.div [ Field.IsGrouped ] [
-                    Control.p [ Control.IsExpanded ] [
-                        Label.label [] [ str "VAT Id" ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch)
-                                     Input.Value custInput.VatId.Raw ]
-                    ]
-                ]
-                Field.div [ Field.IsGrouped ] [
-                    Control.p [ Control.IsExpanded ] [
-                        Label.label [] [ str "Address" ]
-                        Input.text [ Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch)
-                                     Input.Value custInput.Address.Raw ]
-                    ]
-                ]
-                Field.div [ Field.IsGrouped ] [
-                    Control.p [ Control.IsExpanded ] [
-                        Label.label [] [ str "Note" ]
-                        Textarea.textarea [ Textarea.OnChange(fun x -> SetCustomerNote x.Value |> dispatch)
-                                            Textarea.Value custInput.Note.Raw ] []
-                    ]
-                ]
+                createTextField "Name" custInput.Name
+                    [ Input.Placeholder "Name of customer"
+                      Input.OnChange(fun x -> SetCustomerName x.Value |> dispatch) ]
+                createTextField "Identification number" custInput.IdNumber
+                    [ Input.Placeholder "Identification number"
+                      Input.OnChange(fun x -> SetCustomerIdNumber x.Value |> dispatch) ]
+                createTextField "VAT Id" custInput.VatId
+                    [ Input.Placeholder "VAT Id"
+                      Input.OnChange(fun x -> SetCustomerVatId x.Value |> dispatch) ]
+                createTextField "Address" custInput.Address
+                    [ Input.Placeholder "Address"
+                      Input.OnChange(fun x -> SetCustomerAddress x.Value |> dispatch) ]
+                createTextField "Note" custInput.Note
+                    [ Input.Placeholder "Note"
+                      Input.OnChange(fun x -> SetCustomerNote x.Value |> dispatch) ]
+
             ]
             Modal.Card.foot [] [
                 Button.button [ Button.Color IsSuccess
@@ -134,14 +144,10 @@ let createCustomerModal model (dispatch: Msg -> unit) =
 let containerBox (model: Model) (dispatch: Msg -> unit) =
     Box.box' [] [
         fieldset [ ReadOnly model.IsLoading ] [
-            Field.div [ Field.IsGrouped ] [
-                Control.p [ Control.IsExpanded ] [
-                    Label.label [] [ str "Man-day rate" ]
-                    Input.text [ Input.Value(model.InvoiceInput.Rate.Raw)
-                                 Input.Placeholder "Man-day rate in CZK"
-                                 Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
-                ]
-            ]
+            createTextField "Man-day rate" model.InvoiceInput.Rate
+                [ Input.Placeholder "Man-day rate in CZK"
+                  Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
+
             Field.div [ Field.IsGrouped ] [
                 Control.p [ Control.IsExpanded ] [
                     Label.label [] [ str "Month of year" ]
@@ -164,27 +170,13 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                                           Flatpickr.ClassName "input" ]
                 ]
             ]
+            createTextField "Total number of man days" model.InvoiceInput.ManDays
+                [ Input.Placeholder "Total number of man days"
+                  Input.OnChange(fun x -> SetMandays x.Value |> dispatch) ]
+            createTextField "Order number" model.InvoiceInput.OrderNumber
+                [ Input.Placeholder "Order number"
+                  Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
 
-            Field.div [ Field.IsGrouped ] [
-                Control.p [ Control.IsExpanded ] [
-                    Label.label [] [
-                        str "Total number of man days"
-                    ]
-                    Input.text [ Input.Value(model.InvoiceInput.ManDays.Raw)
-                                 Input.Placeholder "Total number of man days"
-                                 Input.OnChange(fun x -> SetMandays x.Value |> dispatch) ]
-                ]
-            ]
-            Field.div [ Field.IsGrouped ] [
-                Control.p [ Control.IsExpanded ] [
-                    Label.label [] [
-                        str "Order number"
-                    ]
-                    Input.text [ Input.Value(match model.InvoiceInput.OrderNumber with | None -> "" | Some s -> s)
-                                 Input.Placeholder "Order number"
-                                 Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
-                ]
-            ]
             Field.div [ Field.IsExpanded ] [
                 Label.label [] [ str "Customer" ]
                 Field.p [ Field.HasAddons ] [
@@ -199,11 +191,10 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
                                 | Resolved custs ->
                                     for i = 0 to custs.Length - 1 do
                                         let c = custs.[i]
-                                        yield
-                                            option [ Value(i)
-                                                     Selected(model.SelectedCustomer = Some c) ] [
-                                                str <| sprintf "%s (%i)" c.Name c.IdNumber
-                                            ]
+                                        yield option [ Value(i)
+                                                       Selected(model.SelectedCustomer = Some c) ] [
+                                                  str <| sprintf "%s (%i)" c.Name c.IdNumber
+                                              ]
                                 | _ -> ()
                             ]
                         ]
@@ -235,8 +226,9 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
 let view (model: Model) (dispatch: Msg -> unit) =
     Hero.hero [ Hero.Color IsPrimary
                 Hero.IsFullHeight
-                Hero.Props [ Style [ Background """url("kid2.png") no-repeat center center fixed"""
-                                     BackgroundSize "cover" ] ] ] [
+                Hero.Props
+                    [ Style [ Background """url("kid2.png") no-repeat center center fixed"""
+                              BackgroundSize "cover" ] ] ] [
         Hero.head [] [
             Navbar.navbar [] [
                 Container.container [] [ navBrand ]
@@ -257,13 +249,21 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                                             (match res with
                                                              | Ok _ -> IsSuccess
                                                              | Error _ -> IsDanger) ] [
-                                str
-                                    (match res with
-                                     | Ok s
-                                     | Error s -> s)
+
+                                (match res with
+                                 | Ok s -> str s
+                                 | Error [ one ] -> str (one)
+                                 | Error e ->
+                                     Content.content [] [
+                                         ul [] [
+                                             for s in e do
+                                                 li [] [ str s ]
+                                         ]
+                                     ])
                             ]
                         | None _ ->
-                            Notification.notification [ Notification.Modifiers [ Modifier.IsInvisible(Screen.All, true) ] ] []
+                            Notification.notification [ Notification.Modifiers
+                                                            [ Modifier.IsInvisible(Screen.All, true) ] ] []
                     ]
                     Column.column [ Column.Width(Screen.All, Column.IsHalf) ] [
                         invoicesTable model dispatch
