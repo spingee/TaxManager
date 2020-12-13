@@ -172,7 +172,7 @@ let containerBox (model: Model) (dispatch: Msg -> unit) =
             ]
             createTextField "Total number of man days" model.InvoiceInput.ManDays
                 [ Input.Placeholder "Total number of man days"
-                  Input.OnChange(fun x -> SetMandays x.Value |> dispatch) ]
+                  Input.OnChange(fun x -> SetManDays x.Value |> dispatch) ]
             createTextField "Order number" model.InvoiceInput.OrderNumber
                 [ Input.Placeholder "Order number"
                   Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]

@@ -14,7 +14,7 @@ type Msg =
     | AddedInvoice of Result<string, string>
     | SetRate of string
     | SetAccPeriod of DateTime
-    | SetMandays of string
+    | SetManDays of string
     | SetOrderNumber of string
     | SetCustomerIdNumber of string
     | SetCustomerVatId of string
@@ -117,7 +117,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   { modelInvoiceInput with
                         AccountingPeriod = v } },
         Cmd.none
-    | SetMandays v ->
+    | SetManDays v ->
         let md =
             match Byte.TryParse v with
             | true, parsed -> Validated.success v parsed
