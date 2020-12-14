@@ -4,6 +4,7 @@ open Elmish
 open Elmish.React
 open Fable.Core.JsInterop
 
+importAll "bulma/css/bulma.min.css"
 importAll "flatpickr/dist/themes/dark.css"
 importAll "flatpickr/dist/plugins/monthSelect/style.css"
 
