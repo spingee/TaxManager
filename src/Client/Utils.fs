@@ -1,5 +1,15 @@
 module Utils
 open System
+open Fable.React
+open Fulma
+open FsToolkit.ErrorHandling
+
+type Validated<'t> = { Raw: string; Parsed: Validation<'t,string> }
+
+module Validated =
+    let createEmpty (): Validated<_> = { Raw = ""; Parsed = Error [] }
+    let success raw value: Validated<_> = { Raw = raw; Parsed = Ok value }
+    let failure raw errors: Validated<_> = { Raw = raw; Parsed = Error errors }
 type Deferred<'t> =
     | HasNotStartedYet
     | InProgress
@@ -11,6 +21,8 @@ type AsyncOperationStatus<'t> =
 
 let exceptionToResult (ex:#Exception) =
     Error ex.Message
+
+
 
 [<RequireQualifiedAccess>]
 module Deferred =

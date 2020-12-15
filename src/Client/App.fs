@@ -16,7 +16,7 @@ open Elmish.HMR
 
 
 
-Program.mkProgram State.init State.update Index.view
+Program.mkProgram Index.init Index.update Index.view
 #if DEBUG
 |> Program.withConsoleTrace
 #endif

@@ -3,8 +3,6 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Option.fs" />
-    <Compile Include="ResultEx.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
 </Project>

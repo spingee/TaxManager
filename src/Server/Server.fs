@@ -66,7 +66,7 @@ let invoiceApi =
 
                       invoices.Insert(invoice) |> ignore
 
-                      return Ok "Success"
+                      return Ok invoice.Id
                   with ex -> return Error <| sprintf "%s" ex.Message
               }
       getCustomers =

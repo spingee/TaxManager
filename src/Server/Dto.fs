@@ -3,7 +3,7 @@ module Dto
 
 open System
 open Shared
-
+open FsToolkit.ErrorHandling
 
 [<CLIMutable>]
 type Customer =
