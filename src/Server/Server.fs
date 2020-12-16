@@ -29,6 +29,7 @@ let invoiceApi =
                   try
                       use db = new LiteDatabase(connectionString)
 
+
                       let invoices =
                           db.GetCollection<Dto.Invoice>("invoices")
 
