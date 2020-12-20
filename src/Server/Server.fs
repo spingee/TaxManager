@@ -37,10 +37,12 @@ let invoiceApi =
                       let dateMonth = invoice.AccountingPeriod.Date.Month
 
                       let samePeriodCount =
-                          invoices.Query()
-                                  .Where(fun f ->
+                          invoices
+                              .Query()
+                              .Where(fun f ->
                                   f.AccountingPeriod.Year = dateYear
-                                  && f.AccountingPeriod.Month = dateMonth).Count()
+                                  && f.AccountingPeriod.Month = dateMonth)
+                              .Count()
 
                       let indexNumber = samePeriodCount + 1
 
@@ -82,12 +84,16 @@ let invoiceApi =
                       // BsonExpression.Create("group by") // todo
                       //   let lol = BsonMapper.Global.GetExpression(fun i -> i.Customer)
                       //   let troll = invoices.Query().GroupBy(lol).Select(lol).ToArray();
-                      return invoices.Query().Select(fun i -> i.Customer).ToArray()
-                             |> List.ofSeq
-                             |> List.groupBy id
-                             |> List.map fst
-                             |> List.traverseResultA Dto.fromCustomerDto
-                             |> Result.mapError (fun e -> String.concat ", " e)
+                      return
+                          invoices
+                              .Query()
+                              .Select(fun i -> i.Customer)
+                              .ToArray()
+                          |> List.ofSeq
+                          |> List.groupBy id
+                          |> List.map fst
+                          |> List.traverseResultA Dto.fromCustomerDto
+                          |> Result.mapError (fun e -> String.concat ", " e)
 
                   with e -> return Error e.Message
               }
@@ -96,11 +102,15 @@ let invoiceApi =
               async {
                   try
                       use db = new LiteDatabase(connectionString)
-                      return db.GetCollection<Dto.Invoice>("invoices").FindAll()
-                             |> List.ofSeq
-                             |> List.sortByDescending (fun x ->
-                                 x.AccountingPeriod.Year, x.AccountingPeriod.Month, x.Inserted)
-                             |> List.traverseResultM Dto.fromInvoiceDto
+
+                      return
+                          db
+                              .GetCollection<Dto.Invoice>("invoices")
+                              .FindAll()
+                          |> List.ofSeq
+                          |> List.sortByDescending (fun x ->
+                              x.AccountingPeriod.Year, x.AccountingPeriod.Month, x.Inserted)
+                          |> List.traverseResultM Dto.fromInvoiceDto
                   with e -> return Error e.Message
               }
       removeInvoice =
@@ -110,13 +120,37 @@ let invoiceApi =
                       use db = new LiteDatabase(connectionString)
 
                       let isDeleted =
-                          db.GetCollection<Dto.Invoice>("invoices").Delete(BsonValue(id))
+                          db
+                              .GetCollection<Dto.Invoice>("invoices")
+                              .Delete(BsonValue(id))
 
                       if (isDeleted) then
                           return Ok()
                       else
-                          return Error
-                                 <| sprintf "Invoice with id %A was not removed." id
+                          return
+                              Error
+                              <| sprintf "Invoice with id %A was not removed." id
+                  with e -> return Error e.Message
+              }
+      searchOrderNumber =
+          fun s ->
+              async {
+                  try
+                      use db = new LiteDatabase(connectionString)
+
+                      return
+                          db
+                              .GetCollection<Dto.Invoice>("invoices")
+                              .Query()
+                              .Where(fun i ->
+                                  i.OrderNumber.IsSome
+                                  && i.OrderNumber.Value.StartsWith(s))
+                              .Select(fun i -> i.OrderNumber.Value)
+                              .ToList()
+                          |> List.ofSeq
+                          |> List.distinct
+                          |> List.sortByDescending id
+                          |> Ok
                   with e -> return Error e.Message
               } }
 

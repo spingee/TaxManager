@@ -12,6 +12,7 @@
         <Compile Include="Utils.fs" />
         <Compile Include="Api.fs" />
         <Compile Include="Views\Common.fs" />
+        <Compile Include="Views\Autocomplete.fs" />
         <Compile Include="Views\Customer.fs" />
         <Compile Include="Views\Invoice.fs" />
         <Compile Include="Views\Invoices.fs" />

@@ -38,7 +38,8 @@ module Invoice =
         { addInvoice: Invoice -> Async<Result<Guid, string>>
           getCustomers: unit -> Async<Result<Customer list, string>>
           getInvoices: unit -> Async<Result<Invoice list, string>>
-          removeInvoice: Guid ->  Async<Result<unit, string>>}
+          removeInvoice: Guid ->  Async<Result<unit, string>>
+          searchOrderNumber: string ->  Async<Result<string list, string>>}
 
 
 module Route =

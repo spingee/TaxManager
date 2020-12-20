@@ -3,6 +3,7 @@ framework: net5.0, netstandard2.0
 storage: none
 
 nuget Fable.React.Flatpickr
+nuget Fable.Reaction
 nuget Fable.Remoting.Giraffe
 nuget FsToolkit.ErrorHandling
 nuget GemBox.Spreadsheet

@@ -274,7 +274,7 @@ let view =
 
                 Field.div [ Field.IsExpanded ] [
                     Label.label [] [ str "Customer" ]
-                    Field.p [ Field.HasAddons ] [
+                    Field.div [ Field.HasAddons ] [
                         Control.div [ Control.IsExpanded ] [
                             Select.select [ Select.IsFullWidth
                                             Select.IsLoading(model.Customers = InProgress) ] [
@@ -296,7 +296,7 @@ let view =
                                 ]
                             ]
                         ]
-                        Control.div [] [
+                        Control.p [] [
                             Button.a [ Button.Color IsPrimary
                                        Button.OnClick(fun _ -> dispatch BeginCreateCustomer) ] [
                                 Icon.icon [] [

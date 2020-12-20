@@ -6,7 +6,6 @@ open Fulma
 open Fable.React
 
 
-
 [<Erase>]
 type Html =
     static member inline none : ReactElement = unbox null
@@ -26,7 +25,7 @@ let inline createTextField label validated (options: Input.Option list)  =
                  @ options)
             match validated.Parsed with
             | Error []
-            | Ok _ -> div [] []
+            | Ok _ -> Html.none
             | Error (e :: _) ->
                 Help.help [ Help.Color IsDanger ] [
                     str e
