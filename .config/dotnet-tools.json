@@ -13,12 +13,6 @@
       "commands": [
         "fake"
       ]
-    },
-    "femto": {
-      "version": "0.8.7",
-      "commands": [
-        "femto"
-      ]
     }
   }
 }

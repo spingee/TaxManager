@@ -1,25 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.fsproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="InvoiceTemplate.xlsx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Compile Include="Dto.fs" />
-    <Compile Include="InvoiceExcel.fs" />
-    <None Include="paket.references" />
-    <Compile Include="Server.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="GemBox.Spreadsheet" Version="47.0.1000" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="db\" />
-  </ItemGroup>
-  <Import Project="..\..\.paket\Paket.Restore.targets" />
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net5.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\Shared\Shared.fsproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Folder Include="db\"/>
+        <Compile Include="Dto.fs"/>
+        <Compile Include="InvoiceExcel.fs"/>
+        <Compile Include="Server.fs"/>
+        <Content Include="InvoiceTemplate.xlsx">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <None Include="paket.references"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="GemBox.Spreadsheet" Version="47.0.1000"/>
+    </ItemGroup>
+    <ItemGroup>
+
+    </ItemGroup>
+    <Import Project="..\..\.paket\Paket.Restore.targets"/>
 </Project>

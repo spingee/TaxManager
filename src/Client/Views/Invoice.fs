@@ -56,6 +56,7 @@ type Msg =
     | LoadCustomers of AsyncOperationStatus<Result<Customer list, string>>
     | BeginCreateCustomer
     | CustomerMsg of Customer.Msg
+    | Select of string
 
 let init () =
     let submodel, cmd = Customer.init ()
@@ -216,6 +217,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   | Ok _ -> None
                   | Error s -> Some(Error [ s ]) },
         Cmd.none
+    | Select s -> model, Cmd.ofMsg (SetOrderNumber s)
 
 
 
@@ -271,6 +273,8 @@ let view =
                     model.OrderNumber
                     [ Input.Placeholder "Order number"
                       Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
+
+                AutoComplete.textBox { Search= invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=400 }
 
                 Field.div [ Field.IsExpanded ] [
                     Label.label [] [ str "Customer" ]

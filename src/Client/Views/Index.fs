@@ -17,7 +17,6 @@ type Model =
 type Msg =
     | InvoiceMsg of Invoice.Msg
     | InvoicesMsg of Invoices.Msg
-    | Select of string
 
 
 
@@ -61,7 +60,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             { model with
                   InvoicesModel = newSubModel },
             Cmd.map InvoicesMsg cmd
-    | Select s -> model, Cmd.none
+
 
 
 let navBrand =
@@ -72,11 +71,6 @@ let navBrand =
         ]
     ]
 
-
-
-open AutoComplete
-
-
 let view (model: Model) (dispatch: Msg -> unit) =
     Hero.hero [ Hero.Color IsPrimary
                 Hero.IsFullHeight
@@ -85,7 +79,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
         Hero.head [] [
             Navbar.navbar [] [
                 Container.container [] [ navBrand ]
-                autocomplete { Search=Api.invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=750 }
             ]
         ]
 

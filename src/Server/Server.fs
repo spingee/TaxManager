@@ -143,8 +143,8 @@ let invoiceApi =
                               .GetCollection<Dto.Invoice>("invoices")
                               .Query()
                               .Where(fun i ->
-                                  i.OrderNumber.IsSome
-                                  && i.OrderNumber.Value.StartsWith(s))
+
+                                   i.OrderNumber.Value.StartsWith(s))
                               .Select(fun i -> i.OrderNumber.Value)
                               .ToList()
                           |> List.ofSeq
