@@ -87,6 +87,7 @@ let invoiceApi =
                       return
                           invoices
                               .Query()
+                              .OrderByDescending(fun i -> i.Inserted)
                               .Select(fun i -> i.Customer)
                               .ToArray()
                           |> List.ofSeq

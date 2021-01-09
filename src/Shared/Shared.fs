@@ -29,9 +29,10 @@ module Invoice =
     type Invoice =
         { Id: Guid
           ManDays: uint8
-          Rate: uint16
+          Rate: uint32
           AccountingPeriod: DateTime
           OrderNumber: string option
+          Vat: uint8 option
           Customer: Customer }
 
     type IInvoiceApi =

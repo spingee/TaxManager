@@ -20,7 +20,7 @@ let monthSelectPlugin (x: obj): obj -> obj =
 
 type Model =
     { ManDays: Validated<uint8>
-      Rate: Validated<uint16>
+      Rate: Validated<uint32>
       OrderNumber: Validated<string option>
       AccountingPeriod: DateTime
       SelectedCustomer: Customer option
@@ -61,7 +61,7 @@ type Msg =
 let init () =
     let submodel, cmd = Customer.init ()
 
-    { Rate = Validated.success "6000" <| uint16 6000
+    { Rate = Validated.success "6000" <| uint32 6000
       ManDays = Validated.success "20" 20uy
       AccountingPeriod = DateTime.Today.AddMonths(-1).Date
       OrderNumber =
@@ -112,7 +112,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                       Rate = rateParsed
                       ManDays = manDaysParsed
                       AccountingPeriod = modelInvoiceInput.AccountingPeriod
-                      OrderNumber = orderNumber }
+                      OrderNumber = orderNumber
+                      Vat = Some 21uy }
             }
 
         match inv with
@@ -131,7 +132,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         | Error str -> { model with Result = Some(Error str) }, Cmd.none
     | SetRate v ->
         let rate =
-            match UInt16.TryParse v with
+            match UInt32.TryParse v with
             | true, parsed -> Validated.success v parsed
             | false, _ -> Validated.failure v [ "Must be whole positive number less than 32768." ]
 

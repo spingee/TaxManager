@@ -17,9 +17,10 @@ type Customer =
 type Invoice =
     { Id: Guid
       ManDays: uint8
-      Rate: uint16
+      Rate: uint32
       AccountingPeriod: DateTime
       OrderNumber: string option
+      Vat : uint8 option
       Customer: Customer
       Inserted: DateTime }
 
@@ -50,6 +51,7 @@ let toInvoiceDto inserted (invoice: Invoice.Invoice) : Invoice =
       Rate = invoice.Rate
       AccountingPeriod = invoice.AccountingPeriod
       OrderNumber = invoice.OrderNumber
+      Vat = invoice.Vat
       Customer = customer
       Inserted = inserted }
 
@@ -63,6 +65,7 @@ let fromInvoiceDto (dto: Invoice) =
               Rate = dto.Rate
               AccountingPeriod = dto.AccountingPeriod
               OrderNumber= dto.OrderNumber
+              Vat = dto.Vat
               Customer = customer }
 
         return invoice

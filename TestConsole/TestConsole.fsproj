@@ -9,8 +9,10 @@
         <Compile Include="Program.fs" />
     </ItemGroup>
 
+
+
     <ItemGroup>
-      <PackageReference Include="LiteDB.FSharp" Version="2.15.1" />
+      <ProjectReference Include="..\src\Server\Server.fsproj" />
     </ItemGroup>
 
 
