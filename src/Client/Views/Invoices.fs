@@ -104,6 +104,8 @@ let view =
                         th [] [ str "Rate" ]
                         th [] [ str "Man Days" ]
                         th [] [ str "Total" ]
+                        th [] [ str "VAT" ]
+                        th [] [ str "Total VAT" ]
                         th [] [ str "Customer" ]
                         th [] [ str "Action" ]
                     ]
@@ -116,6 +118,8 @@ let view =
                             |> List.sortByDescending (fun x -> x.AccountingPeriod)
                             |> List.map (fun i ->
                                 tr [] [
+                                    let total = (int i.ManDays) * (int i.Rate)
+                                    let vat = i.Vat |> Option.map (fun v -> (total/ 100 * (int v))) |> Option.defaultValue 0
                                     td [] [
                                         str
                                         <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
@@ -124,7 +128,12 @@ let view =
                                     td [] [ str <| i.ManDays.ToString() ]
                                     td [] [
                                         str
-                                        <| (sprintf "%i" ((int i.ManDays) * (int i.Rate)))
+                                        <| (sprintf "%i" total)
+                                    ]
+                                    td [] [ ofInt vat ]
+                                    td [] [
+                                        str
+                                        <| (sprintf "%i" (i.Vat |> Option.map (fun v -> total + (total/ 100 * (int v))) |> Option.defaultValue total ))
                                     ]
                                     td [] [
                                         str <| i.Customer.Name.ToString()

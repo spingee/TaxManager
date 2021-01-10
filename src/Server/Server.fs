@@ -47,13 +47,14 @@ let invoiceApi =
                       let indexNumber = samePeriodCount + 1
 
                       let outputFile =
-                          Path.Combine
-                              (documentOutputDir,
-                               sprintf
-                                   "Faktura - %i-%02i-%02i"
-                                   invoice.AccountingPeriod.Year
-                                   invoice.AccountingPeriod.Month
-                                   indexNumber)
+                          Path.Combine(
+                              documentOutputDir,
+                              sprintf
+                                  "Faktura - %i-%02i-%02i"
+                                  invoice.AccountingPeriod.Year
+                                  invoice.AccountingPeriod.Month
+                                  indexNumber
+                          )
 
                       createExcelAndPdfInvoice outputFile invoice indexNumber
 
@@ -109,8 +110,8 @@ let invoiceApi =
                               .GetCollection<Dto.Invoice>("invoices")
                               .FindAll()
                           |> List.ofSeq
-                          |> List.sortByDescending (fun x ->
-                              x.AccountingPeriod.Year, x.AccountingPeriod.Month, x.Inserted)
+                          |> List.sortByDescending
+                              (fun x -> x.AccountingPeriod.Year, x.AccountingPeriod.Month, x.Inserted)
                           |> List.traverseResultM Dto.fromInvoiceDto
                   with e -> return Error e.Message
               }
@@ -143,14 +144,80 @@ let invoiceApi =
                           db
                               .GetCollection<Dto.Invoice>("invoices")
                               .Query()
-                              .Where(fun i ->
-
-                                   i.OrderNumber.Value.StartsWith(s))
-                              .Select(fun i -> i.OrderNumber.Value)
+                              .Where(fun i -> i.OrderNumber.StartsWith(s))
+                              .Select(fun i -> i.OrderNumber)
                               .ToList()
                           |> List.ofSeq
                           |> List.distinct
                           |> List.sortByDescending id
+                          |> Ok
+                  with e -> return Error e.Message
+              }
+      getTotals =
+          fun s ->
+              async {
+                  try
+                      use db = new LiteDatabase(connectionString)
+                      let y = DateTime.Now.AddYears(-1)
+                      let s = DateTime(y.Year,1,1)
+                      let e = s.AddYears(1)
+
+                      let lastYear =
+                          db
+                              .GetCollection<Dto.Invoice>("invoices")
+                              .Query()
+                              .Where(fun i -> i.AccountingPeriod >= s && i.AccountingPeriod < e)
+                              .ToArray()
+                          |> Array.sumBy
+                              (fun a ->
+                                  let total = a.Rate * uint32 a.ManDays
+
+                                  match Option.ofNullable a.Vat with
+                                  | None -> total
+                                  | Some v -> total + (total / uint32 100 * uint32 v))
+
+                      let quarterStart, quarterEnd =
+                          match DateTime.Now.Month with
+                          | 1
+                          | 2
+                          | 3 -> 10, 12, DateTime.Now.Year - 1
+                          | 4
+                          | 5
+                          | 6 -> 1, 3,DateTime.Now.Year
+                          | 7
+                          | 8
+                          | 9 -> 4, 6,DateTime.Now.Year
+                          | 10
+                          | 11
+                          | 12 -> 7, 9,DateTime.Now.Year
+                          | _ -> failwith "nonsense"
+                          |> fun (s,e,y) -> DateTime(y,s,1),DateTime(y,e,1).AddMonths(1)
+
+
+                      let lastQuarterBase =
+                          db
+                              .GetCollection<Dto.Invoice>("invoices")
+                              .Query()
+                              .Where(fun i -> i.AccountingPeriod >= quarterStart && i.AccountingPeriod < quarterEnd)
+                              .ToArray()
+                      let lastQuarter =
+                          lastQuarterBase
+                          |> Array.sumBy
+                              (fun a ->
+                                  a.Rate * uint32 a.ManDays)
+                      let lastQuarterVat =
+                          lastQuarterBase
+                          |> Array.sumBy
+                              (fun a ->
+                                  let total = a.Rate * uint32 a.ManDays
+                                  match Option.ofNullable a.Vat with
+                                  | None -> total
+                                  | Some v -> (total / uint32 100 * uint32 v))
+
+                      return
+                          { LastYearTotal = lastYear
+                            LastQuarterTotal = lastQuarter
+                            LastQuarterTotalVat = lastQuarterVat}
                           |> Ok
                   with e -> return Error e.Message
               } }

@@ -104,12 +104,13 @@ let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice indexNum
     let tax =
         Math.Round(((float sumWithoutTax) * 0.21), 0)
 
+    let shortDatePattern = CultureInfo("cs-CZ").DateTimeFormat.ShortDatePattern
     let total = float sumWithoutTax + tax
     ws.Cells.["D2"].Value <- invoiceNumber
     ws.Cells.["D5"].Value <- invoiceNumber
-    ws.Cells.["C15"].Value <- dateOfTaxableSupply
-    ws.Cells.["C16"].Value <- dueDate
-    ws.Cells.["C18"].Value <- dateOfTaxableSupply
+    ws.Cells.["C15"].Value <- dateOfTaxableSupply.ToString(shortDatePattern)
+    ws.Cells.["C16"].Value <- dueDate.ToString(shortDatePattern)
+    ws.Cells.["C18"].Value <- dateOfTaxableSupply.ToString(shortDatePattern)
     ws.Cells.["A20"].Value <- sprintf
                                   "Programové práce za měsíc %i/%i"
                                   invoice.AccountingPeriod.Month

@@ -34,13 +34,18 @@ module Invoice =
           OrderNumber: string option
           Vat: uint8 option
           Customer: Customer }
+    type Totals =
+        { LastYearTotal: UInt32
+          LastQuarterTotal: UInt32
+          LastQuarterTotalVat: UInt32 }
 
     type IInvoiceApi =
         { addInvoice: Invoice -> Async<Result<Guid, string>>
           getCustomers: unit -> Async<Result<Customer list, string>>
           getInvoices: unit -> Async<Result<Invoice list, string>>
           removeInvoice: Guid ->  Async<Result<unit, string>>
-          searchOrderNumber: string ->  Async<Result<string list, string>>}
+          searchOrderNumber: string ->  Async<Result<string list, string>>
+          getTotals:  unit -> Async<Result<Totals, string>> }
 
 
 module Route =

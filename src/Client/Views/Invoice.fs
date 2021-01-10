@@ -275,7 +275,7 @@ let view =
                     [ Input.Placeholder "Order number"
                       Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
 
-                AutoComplete.textBox { Search= invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=400 }
+                // AutoComplete.textBox { Search= invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=400 }
 
                 Field.div [ Field.IsExpanded ] [
                     Label.label [] [ str "Customer" ]
