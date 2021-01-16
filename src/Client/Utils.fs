@@ -1,7 +1,6 @@
 module Utils
 open System
-open Fable.React
-open Fulma
+open Fable.Core
 open FsToolkit.ErrorHandling
 
 type Validated<'t> = { Raw: string; Parsed: Validation<'t,string> }
@@ -22,6 +21,8 @@ type AsyncOperationStatus<'t> =
 let exceptionToResult (ex:#Exception) =
     Error ex.Message
 
+[<Emit("new Intl.NumberFormat({ style: 'decimal', maximumFractionDigits: $0, minimumFractionDigits: $0 }).format($1)")>]
+let formatDecimal (fractionDigits: int) (value: decimal) = jsNative
 
 
 [<RequireQualifiedAccess>]

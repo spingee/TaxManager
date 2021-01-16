@@ -1,24 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
-        <LangVersion>preview</LangVersion>
-    </PropertyGroup>
-    <ItemGroup>
-        <ProjectReference Include="..\Shared\Shared.fsproj" />
-    </ItemGroup>
-    <ItemGroup>
-        <None Include="index.html" />
-        <None Include="paket.references" />
-        <Compile Include="Utils.fs" />
-        <Compile Include="Api.fs" />
-        <Compile Include="Views\Common.fs" />
-        <Compile Include="Views\Autocomplete.fs" />
-        <Compile Include="Views\Customer.fs" />
-        <Compile Include="Views\Invoice.fs" />
-        <Compile Include="Views\Invoices.fs" />
-        <Compile Include="Views\Index.fs" />
-        <Compile Include="App.fs" />
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
 
-    </ItemGroup>
-    <Import Project="..\..\.paket\Paket.Restore.targets" />
+    <None Include="index.html" />
+    <None Include="paket.references" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Api.fs" />
+    <Compile Include="Views\Common.fs" />
+    <Compile Include="Views\Autocomplete.fs" />
+    <Compile Include="Views\Totals.fs" />
+    <Compile Include="Views\Customer.fs" />
+    <Compile Include="Views\Invoice.fs" />
+    <Compile Include="Views\Invoices.fs" />
+    <Compile Include="Views\Index.fs" />
+    <Compile Include="App.fs" />
+  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

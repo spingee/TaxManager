@@ -34,10 +34,20 @@ module Invoice =
           OrderNumber: string option
           Vat: uint8 option
           Customer: Customer }
+
+    type TotalPrice ={
+        Value:decimal
+        Currency: string
+        TimeRange: string
+    }
     type Totals =
-        { LastYearTotal: UInt32
-          LastQuarterTotal: UInt32
-          LastQuarterTotalVat: UInt32 }
+        { LastYear: TotalPrice
+          LastQuarter: TotalPrice
+          LastQuarterVat: TotalPrice }
+    let TotalsDefault =
+             { LastYear = { Value = 0m; Currency = "CZK"; TimeRange = ""}
+               LastQuarter = { Value = 0m; Currency = "CZK"; TimeRange = ""}
+               LastQuarterVat = { Value = 0m; Currency = "CZK"; TimeRange = ""} }
 
     type IInvoiceApi =
         { addInvoice: Invoice -> Async<Result<Guid, string>>

@@ -12,6 +12,7 @@ open LiteDB
 open FsToolkit.ErrorHandling
 open System.IO
 open MassTransit
+open System.Globalization
 //open System.Linq
 
 let connectionString =
@@ -21,6 +22,11 @@ let documentOutputDir = @"C:\Users\SpinGee\Desktop"
 #else
 let documentOutputDir = "./output"
 #endif
+let cultureInfo = CultureInfo("cs-CZ")
+
+
+do CultureInfo.DefaultThreadCurrentCulture <- cultureInfo
+do CultureInfo.DefaultThreadCurrentUICulture <- cultureInfo;
 
 let invoiceApi =
     { addInvoice =
@@ -176,22 +182,22 @@ let invoiceApi =
                                   | None -> total
                                   | Some v -> total + (total / uint32 100 * uint32 v))
 
-                      let quarterStart, quarterEnd =
+                      let quarterStart, quarterEnd,timeRange =
                           match DateTime.Now.Month with
                           | 1
                           | 2
-                          | 3 -> 10, 12, DateTime.Now.Year - 1
+                          | 3 -> 10, 12, DateTime.Now.Year - 1,"Q4"
                           | 4
                           | 5
-                          | 6 -> 1, 3,DateTime.Now.Year
+                          | 6 -> 1, 3,DateTime.Now.Year,"Q1"
                           | 7
                           | 8
-                          | 9 -> 4, 6,DateTime.Now.Year
+                          | 9 -> 4, 6,DateTime.Now.Year,"Q2"
                           | 10
                           | 11
-                          | 12 -> 7, 9,DateTime.Now.Year
+                          | 12 -> 7, 9,DateTime.Now.Year, "Q3"
                           | _ -> failwith "nonsense"
-                          |> fun (s,e,y) -> DateTime(y,s,1),DateTime(y,e,1).AddMonths(1)
+                          |> fun (s,e,y,r) -> DateTime(y,s,1),DateTime(y,e,1).AddMonths(1),r
 
 
                       let lastQuarterBase =
@@ -215,9 +221,9 @@ let invoiceApi =
                                   | Some v -> (total / uint32 100 * uint32 v))
 
                       return
-                          { LastYearTotal = lastYear
-                            LastQuarterTotal = lastQuarter
-                            LastQuarterTotalVat = lastQuarterVat}
+                          { LastYear = {Value = decimal lastYear ; Currency ="CZK"; TimeRange = y.Year.ToString()}
+                            LastQuarter = {Value = decimal lastQuarter ; Currency ="CZK"; TimeRange = timeRange}
+                            LastQuarterVat = {Value = decimal lastQuarterVat ; Currency ="CZK"; TimeRange = timeRange}}
                           |> Ok
                   with e -> return Error e.Message
               } }
@@ -235,6 +241,7 @@ let app =
         memory_cache
         use_static "public"
         use_gzip
+
     }
 
 SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
