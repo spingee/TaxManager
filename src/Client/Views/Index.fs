@@ -82,7 +82,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Totals =
                   match result with
                   | Ok i -> Resolved i
-                  | Error _ -> Resolved Invoice.TotalsDefault },
+                  | Error e ->
+                         Browser.Dom.console.error(e)
+                         Resolved Invoice.TotalsDefault
+                         },
         Cmd.none
 
 

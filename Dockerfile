@@ -11,4 +11,5 @@ RUN apt-get install libgdiplus -y
 COPY /deploy .
 WORKDIR /
 EXPOSE 8085
+ENV TZ=Europe/Prague
 ENTRYPOINT ["dotnet", "Server.dll"]
