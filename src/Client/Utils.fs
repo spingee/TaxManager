@@ -11,7 +11,7 @@ module Validated =
     let failure raw errors: Validated<_> = { Raw = raw; Parsed = Error errors }
 type Deferred<'t> =
     | HasNotStartedYet
-    | InProgress
+    | InProgress of Option<'t> //ability to add previous value so when reissuing request it wont cause flicking in ui
     | Resolved of 't
 
 type AsyncOperationStatus<'t> =
@@ -30,33 +30,39 @@ module Deferred =
 
     let resolved =
         function
-        | HasNotStartedYet -> false
-        | InProgress -> false
+        | HasNotStartedYet _ -> false
+        | InProgress _ -> false
         | Resolved _ -> true
 
     /// Returns whether the `Deferred<'T>` value is in progress or not.
     let inProgress =
         function
-        | HasNotStartedYet -> false
-        | InProgress -> true
+        | HasNotStartedYet _ -> false
+        | InProgress _ -> true
         | Resolved _ -> false
 
     /// Transforms the underlying value of the input deferred value when it exists from type to another
     let map (transform: 'T -> 'U) (deferred: Deferred<'T>): Deferred<'U> =
         match deferred with
         | HasNotStartedYet -> HasNotStartedYet
-        | InProgress -> InProgress
+        | InProgress value -> InProgress (Option.map transform value)
         | Resolved value -> Resolved(transform value)
 
     /// Verifies that a `Deferred<'T>` value is resolved and the resolved data satisfies a given requirement.
     let exists (predicate: 'T -> bool) =
         function
-        | HasNotStartedYet -> false
-        | InProgress -> false
+        | HasNotStartedYet _-> false
+        | InProgress _ -> false
         | Resolved value -> predicate value
 
     let defaultResolved defaultValue (deferred: Deferred<'T>): 'T =
         match deferred with
         | HasNotStartedYet -> defaultValue
-        | InProgress -> defaultValue
+        | InProgress value -> value |> Option.defaultValue defaultValue
         | Resolved value -> value
+
+    let toOption (deferred: Deferred<'T>): Option<'T> =
+        match deferred with
+        | HasNotStartedYet -> None
+        | InProgress value -> value
+        | Resolved value -> Some value

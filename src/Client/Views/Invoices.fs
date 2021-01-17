@@ -18,10 +18,14 @@ type Model =
       RemovingInvoice: Invoice option }
 
 type Msg =
-    | AddInvoice of Invoice.Invoice
+    | AddInvoice of Invoice
     | HandleException of Exception
     | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
     | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
+
+type ExtMsg =
+    | NoOp
+    | InvoiceRemoved of Invoice
 
 let init (): Model * Cmd<Msg> =
 
@@ -35,7 +39,7 @@ let init (): Model * Cmd<Msg> =
 
     model, cmd
 
-let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
+let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
     match msg with
     | AddInvoice inv ->
         let invs =
@@ -43,18 +47,19 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | Resolved invs -> inv :: invs
             | _ -> [ inv ]
 
-        { model with Invoices = Resolved invs }, Cmd.none
+        { model with Invoices = Resolved invs }, Cmd.none, NoOp
     | HandleException exn ->
         { model with
               Errors = Some(Error [ exn.Message ]) },
-        Cmd.none
+        Cmd.none, NoOp
     | LoadInvoices Started ->
-        { model with Invoices = InProgress },
+        { model with Invoices = InProgress None },
         Cmd.OfAsync.either
             invoiceApi.getInvoices
             ()
             (Finished >> LoadInvoices)
             (exceptionToResult >> Finished >> LoadInvoices)
+            , NoOp
     | LoadInvoices (Finished result) ->
         { model with
               Invoices =
@@ -65,7 +70,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   match result with
                   | Ok _ -> None
                   | Error s -> Some(Error [ s ]) },
-        Cmd.none
+        Cmd.none, NoOp
     | RemoveInvoice (inv, Started) ->
         { model with
               RemovingInvoice = Some inv },
@@ -74,6 +79,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             inv.Id
             (fun x -> RemoveInvoice(inv, Finished(x)))
             (fun x -> RemoveInvoice(inv, Finished(exceptionToResult x)))
+            , NoOp
     | RemoveInvoice (inv, Finished (Ok _)) ->
         { model with
               RemovingInvoice = None
@@ -81,12 +87,12 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Invoices =
                   (model.Invoices
                    |> Deferred.map (fun i -> i |> List.filter (fun x -> x <> inv))) },
-        Cmd.none
+        Cmd.none, InvoiceRemoved inv
     | RemoveInvoice (inv, Finished (Error r)) ->
         { model with
               RemovingInvoice = None
               Errors = Some (Error [r]) },
-        Cmd.none
+        Cmd.none, NoOp
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
 

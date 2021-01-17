@@ -44,34 +44,28 @@ let init (): Model * Cmd<Msg> =
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | InvoiceMsg msg ->
-        match msg with
-        | Invoice.AddInvoice (Finished (inv, Ok id)) ->
-            let subModel, cmd = Invoice.update msg model.InvoiceModel
-            let inv = { inv with Id = id }
+        let newSubModel, cmd, extMsg = Invoice.update msg model.InvoiceModel
 
-            { model with InvoiceModel = subModel },
-            Cmd.batch [ Cmd.ofMsg (InvoicesMsg(Invoices.AddInvoice inv))
-                        Cmd.map InvoiceMsg cmd
-                        Cmd.ofMsg (LoadTotals Started)]
-        | _ ->
-            let newSubModel, cmd = Invoice.update msg model.InvoiceModel
-
-            { model with
-                  InvoiceModel = newSubModel },
+        { model with
+              InvoiceModel = newSubModel },
+        Cmd.batch [
             Cmd.map InvoiceMsg cmd
+            Cmd.ofMsg (LoadTotals Started)
+            match extMsg with
+            | Invoice.InvoiceAdded inv ->  Cmd.ofMsg (InvoicesMsg(Invoices.AddInvoice inv))
+            | _ -> Cmd.none]
     | InvoicesMsg msg ->
-        match msg with
-        | Invoices.RemoveInvoice (inv, Finished (Ok _)) ->
-            let subModel, cmd = Invoices.update msg model.InvoicesModel
-            { model with InvoicesModel = subModel },Cmd.batch [ Cmd.ofMsg (LoadTotals Started); Cmd.map InvoicesMsg cmd]
-        | _ ->
-            let newSubModel, cmd = Invoices.update msg model.InvoicesModel
+        let newSubModel, cmd, extMsg = Invoices.update msg model.InvoicesModel
 
-            { model with
-                  InvoicesModel = newSubModel },
-            Cmd.map InvoicesMsg cmd
+        { model with
+              InvoicesModel = newSubModel },
+        Cmd.batch [ match extMsg with
+                    | Invoices.InvoiceRemoved _ -> Cmd.ofMsg (LoadTotals Started)
+                    | _ -> Cmd.none
+                    Cmd.map InvoicesMsg cmd ]
     | LoadTotals Started ->
-        { model with Totals = InProgress },
+        { model with
+              Totals = InProgress(Deferred.toOption model.Totals) },
         Cmd.OfAsync.either
             invoiceApi.getTotals
             ()
@@ -83,9 +77,12 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   match result with
                   | Ok i -> Resolved i
                   | Error e ->
-                         Browser.Dom.console.error(e)
-                         Resolved Invoice.TotalsDefault
-                         },
+                      Browser.Dom.console.error (e)
+
+                      Resolved(
+                          Deferred.toOption model.Totals
+                          |> Option.defaultValue Invoice.TotalsDefault
+                      ) },
         Cmd.none
 
 
@@ -105,9 +102,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                                      BackgroundSize "cover" ] ] ] [
         Hero.head [] [
             Navbar.navbar [] [
-                Container.container [] [
-                    navBrand
-                ]
+                Container.container [] [ navBrand ]
             ]
         ]
 

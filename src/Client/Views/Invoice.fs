@@ -58,6 +58,10 @@ type Msg =
     | CustomerMsg of Customer.Msg
     | Select of string
 
+type ExtMsg =
+    | NoOp
+    | InvoiceAdded of Invoice
+
 let init () =
     let submodel, cmd = Customer.init ()
 
@@ -79,18 +83,23 @@ let init () =
     Cmd.batch [ Cmd.map CustomerMsg cmd
                 Cmd.ofMsg (LoadCustomers Started) ]
 
-let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
+let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
     let modelInvoiceInput = model
 
     match msg with
-    | AddInvoice (Finished (_, result)) ->
+    | AddInvoice (Finished (inv, result)) ->
         { model with
               Result =
                   match result with
                   | Ok a -> Some(Ok "Success")
                   | Error s -> Some(Error [ s ])
               IsReadOnly = false },
-        Cmd.none
+        Cmd.none ,
+        match result with
+        | Ok id ->
+            let inv = { inv with Id = id }
+            InvoiceAdded inv
+        | _ -> NoOp
     | AddInvoice Started ->
         let inv =
             validation {
@@ -128,38 +137,39 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     (exceptionToResult
                      >> (fun r -> Finished(inv, r) |> AddInvoice))
 
-            model, cmd
-        | Error str -> { model with Result = Some(Error str) }, Cmd.none
+            model, cmd, NoOp
+        | Error str -> { model with Result = Some(Error str) }, Cmd.none, NoOp
     | SetRate v ->
         let rate =
             match UInt32.TryParse v with
             | true, parsed -> Validated.success v parsed
             | false, _ -> Validated.failure v [ "Must be whole positive number less than 32768." ]
 
-        { model with Rate = rate }, Cmd.none
-    | SetAccPeriod v -> { model with AccountingPeriod = v }, Cmd.none
+        { model with Rate = rate }, Cmd.none, NoOp
+    | SetAccPeriod v -> { model with AccountingPeriod = v }, Cmd.none, NoOp
     | SetManDays v ->
         let md =
             match Byte.TryParse v with
             | true, parsed -> Validated.success v parsed
             | false, _ -> Validated.failure v [ "Must be whole number 0-255." ]
 
-        { model with ManDays = md }, Cmd.none
+        { model with ManDays = md }, Cmd.none, NoOp
     | SetOrderNumber v ->
         let orderNumber =
             if String.IsNullOrWhiteSpace(v) then None else Some v
 
         { model with
               OrderNumber = Validated.success v orderNumber },
-        Cmd.none
+        Cmd.none, NoOp
     | HandleException exn ->
         { model with
               IsReadOnly = false
               Result = Some(Error [ exn.Message ]) },
-        Cmd.none
+        Cmd.none, NoOp
     | BeginCreateCustomer ->
         //model,Cmd.none
         { model with CreatingCustomer = true }, Cmd.ofMsg (CustomerMsg(Customer.Start model.SelectedCustomer))
+        , NoOp
     | CustomerMsg msg ->
         match msg with
         | Customer.Finish c ->
@@ -180,13 +190,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
             { model with
                   Customers = Resolved custs },
-            Cmd.none
+            Cmd.none, NoOp
         | _ ->
             let newSubModel, cmd = Customer.update msg model.CustomerModel
 
             { model with
                   CustomerModel = newSubModel },
-            Cmd.map CustomerMsg cmd
+            Cmd.map CustomerMsg cmd, NoOp
     | SelectCustomer str ->
         let model =
             match model.Customers, (String.IsNullOrWhiteSpace str) with
@@ -195,14 +205,15 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                       SelectedCustomer = Some custs.[(int str)] }
             | _, _ -> { model with SelectedCustomer = None }
 
-        model, Cmd.none
+        model, Cmd.none, NoOp
     | LoadCustomers Started ->
-        { model with Customers = InProgress },
+        { model with Customers = InProgress None },
         Cmd.OfAsync.either
             invoiceApi.getCustomers
             ()
             (Finished >> LoadCustomers)
             (exceptionToResult >> Finished >> LoadCustomers)
+            , NoOp
     | LoadCustomers (Finished result) ->
         { model with
               Customers =
@@ -217,8 +228,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                   match result with
                   | Ok _ -> None
                   | Error s -> Some(Error [ s ]) },
-        Cmd.none
-    | Select s -> model, Cmd.ofMsg (SetOrderNumber s)
+        Cmd.none, NoOp
+    | Select s -> model, Cmd.ofMsg (SetOrderNumber s), NoOp
 
 
 
@@ -282,7 +293,7 @@ let view =
                     Field.div [ Field.HasAddons ] [
                         Control.div [ Control.IsExpanded ] [
                             Select.select [ Select.IsFullWidth
-                                            Select.IsLoading(model.Customers = InProgress) ] [
+                                            Select.IsLoading(model.Customers |> Deferred.inProgress) ] [
                                 select [ OnChange(fun e -> dispatch <| SelectCustomer e.Value) ] [
                                     match model.SelectedCustomer with
                                     | None -> yield option [ Value("") ] [ str "" ]
