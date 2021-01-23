@@ -24,6 +24,8 @@ type Model =
       OrderNumber: Validated<string option>
       AccountingPeriod: DateTime
       SelectedCustomer: Customer option
+      VatApplicable: bool
+      Vat: Validated<uint8 option>
       Customers: Deferred<Customer list>
       IsReadOnly: bool
       CreatingCustomer: bool
@@ -51,12 +53,14 @@ type Msg =
     | SetAccPeriod of DateTime
     | SetManDays of string
     | SetOrderNumber of string
+    | SetVat of string
     | SelectCustomer of string
     | HandleException of Exception
     | LoadCustomers of AsyncOperationStatus<Result<Customer list, string>>
     | BeginCreateCustomer
     | CustomerMsg of Customer.Msg
     | Select of string
+    | VatApplicable of bool
 
 type ExtMsg =
     | NoOp
@@ -71,6 +75,8 @@ let init () =
       OrderNumber =
           Validated.success "17Zak00002"
           <| Some "17Zak00002"
+      VatApplicable = true
+      Vat = Validated.success "21" <| Some(uint8 21)
       Customers = HasNotStartedYet
       AddingInvoice = HasNotStartedYet
       IsReadOnly = false
@@ -94,7 +100,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                   | Ok a -> Some(Ok "Success")
                   | Error s -> Some(Error [ s ])
               IsReadOnly = false },
-        Cmd.none ,
+        Cmd.none,
         match result with
         | Ok id ->
             let inv = { inv with Id = id }
@@ -110,10 +116,9 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                     | None -> Error "No customer selected."
 
                 and! rateParsed = modelInvoiceInput.Rate.Parsed
-
                 and! manDaysParsed = modelInvoiceInput.ManDays.Parsed
-
                 and! orderNumber = modelInvoiceInput.OrderNumber.Parsed
+                and! vat = modelInvoiceInput.Vat.Parsed
 
                 return
                     { Id = Guid.NewGuid()
@@ -122,7 +127,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                       ManDays = manDaysParsed
                       AccountingPeriod = modelInvoiceInput.AccountingPeriod
                       OrderNumber = orderNumber
-                      Vat = Some 21uy }
+                      Vat = vat }
             }
 
         match inv with
@@ -133,7 +138,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                       Result = None }
 
             let cmd =
-                Cmd.OfAsync.either invoiceApi.addInvoice inv (fun r -> Finished(inv, r) |> AddInvoice)
+                Cmd.OfAsync.either
+                    invoiceApi.addInvoice
+                    inv
+                    (fun r -> Finished(inv, r) |> AddInvoice)
                     (exceptionToResult
                      >> (fun r -> Finished(inv, r) |> AddInvoice))
 
@@ -156,20 +164,34 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
         { model with ManDays = md }, Cmd.none, NoOp
     | SetOrderNumber v ->
         let orderNumber =
-            if String.IsNullOrWhiteSpace(v) then None else Some v
+            if String.IsNullOrWhiteSpace(v) then
+                None
+            else
+                Some v
 
         { model with
               OrderNumber = Validated.success v orderNumber },
-        Cmd.none, NoOp
+        Cmd.none,
+        NoOp
+    | SetVat v ->
+        let vat =
+            match model.VatApplicable with
+            | false -> Validated.success v None
+            | true ->
+                match Byte.TryParse v with
+                | true, parsed -> Validated.success v <| Some parsed
+                | false, _ -> Validated.failure v [ "Must be whole number 0-255." ]
+
+        { model with Vat = vat }, Cmd.none, NoOp
     | HandleException exn ->
         { model with
               IsReadOnly = false
               Result = Some(Error [ exn.Message ]) },
-        Cmd.none, NoOp
+        Cmd.none,
+        NoOp
     | BeginCreateCustomer ->
         //model,Cmd.none
-        { model with CreatingCustomer = true }, Cmd.ofMsg (CustomerMsg(Customer.Start model.SelectedCustomer))
-        , NoOp
+        { model with CreatingCustomer = true }, Cmd.ofMsg (CustomerMsg(Customer.Start model.SelectedCustomer)), NoOp
     | CustomerMsg msg ->
         match msg with
         | Customer.Finish c ->
@@ -190,13 +212,15 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
 
             { model with
                   Customers = Resolved custs },
-            Cmd.none, NoOp
+            Cmd.none,
+            NoOp
         | _ ->
             let newSubModel, cmd = Customer.update msg model.CustomerModel
 
             { model with
                   CustomerModel = newSubModel },
-            Cmd.map CustomerMsg cmd, NoOp
+            Cmd.map CustomerMsg cmd,
+            NoOp
     | SelectCustomer str ->
         let model =
             match model.Customers, (String.IsNullOrWhiteSpace str) with
@@ -207,13 +231,14 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
 
         model, Cmd.none, NoOp
     | LoadCustomers Started ->
-        { model with Customers = InProgress None },
+        { model with
+              Customers = InProgress None },
         Cmd.OfAsync.either
             invoiceApi.getCustomers
             ()
             (Finished >> LoadCustomers)
-            (exceptionToResult >> Finished >> LoadCustomers)
-            , NoOp
+            (exceptionToResult >> Finished >> LoadCustomers),
+        NoOp
     | LoadCustomers (Finished result) ->
         { model with
               Customers =
@@ -228,14 +253,22 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                   match result with
                   | Ok _ -> None
                   | Error s -> Some(Error [ s ]) },
-        Cmd.none, NoOp
+        Cmd.none,
+        NoOp
     | Select s -> model, Cmd.ofMsg (SetOrderNumber s), NoOp
+    | VatApplicable b -> { model with
+                               VatApplicable = b
+                               Vat= match b with
+                                    | true -> Validated.success "21" <| Some 21uy
+                                    | false -> Validated.success "" <| None }
+                           , Cmd.none, NoOp
 
 
 
 
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
+
 let elmishView name render =
     FunctionComponent.Of(render, name, equalsButFunctions)
 
@@ -246,7 +279,8 @@ let view =
     <| fun { Props.Model = model
              Dispatch = dispatch } ->
         Box.box' [] [
-            fieldset [ HTMLAttr.ReadOnly model.IsReadOnly ] [
+
+            fieldset [ ReadOnly model.IsReadOnly ] [
                 createTextField
                     "Man-day rate"
                     model.Rate
@@ -257,18 +291,21 @@ let view =
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Month of year" ]
                         Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
-                                              Flatpickr.Value
-                                                  (System.DateTime
-                                                      (int model.AccountingPeriod.Year,
-                                                       int model.AccountingPeriod.Month,
-                                                       1))
+                                              Flatpickr.Value(
+                                                  System.DateTime(
+                                                      int model.AccountingPeriod.Year,
+                                                      int model.AccountingPeriod.Month,
+                                                      1
+                                                  )
+                                              )
                                               Flatpickr.DateFormat "F Y"
                                               Flatpickr.custom
                                                   "plugins"
-                                                  [| monthSelectPlugin
-                                                      ({| shorthand = true
-                                                          dateFormat = "F Y"
-                                                          altFormat = "F Y" |}) |]
+                                                  [| monthSelectPlugin (
+                                                      {| shorthand = true
+                                                         dateFormat = "F Y"
+                                                         altFormat = "F Y" |}
+                                                  ) |]
 
                                                   true
                                               Flatpickr.Locale Flatpickr.Locales.czech
@@ -320,6 +357,41 @@ let view =
                                 ]
                             ]
                         ]
+                    ]
+                ]
+
+                Field.div [ Field.IsGroupedRight
+                            Field.HasAddons ] [
+                    Control.p [] [
+                        Checkbox.checkbox [] [
+                            Checkbox.input [ Props [ OnChange(fun e -> dispatch <| VatApplicable e.Checked)
+                                                     Checked model.VatApplicable ] ]
+                            str " Vat applicable"
+                        ]
+                    ]
+
+                    Control.p [ Control.Props [ Style [ if (not model.VatApplicable) then
+                                                            Visibility "hidden" ] ] ] [
+                        Input.text [ match model.Vat.Parsed with
+                                     | Error []
+                                     | Ok _ -> ()
+                                     | Error _ -> Input.Color IsDanger
+                                     Input.Value(model.Vat.Raw)
+                                     Input.OnChange(fun x -> SetVat x.Value |> dispatch)
+                                     Input.Placeholder "21"
+                                     Input.Props [ Size 1.0 ] ]
+
+                        match model.Vat.Parsed with
+                        | Error []
+                        | Ok _ -> Html.none
+                        | Error (e :: _) ->
+                            Help.help [ Help.Color IsDanger ] [
+                                str e
+                            ]
+                    ]
+                    Control.p [ Control.Props [ Style [ if (not model.VatApplicable) then
+                                                            Visibility "hidden" ] ] ] [
+                        str "%"
                     ]
                 ]
                 Field.div [ Field.IsGrouped ] [

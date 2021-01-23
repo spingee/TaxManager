@@ -21,7 +21,7 @@ type AsyncOperationStatus<'t> =
 let exceptionToResult (ex:#Exception) =
     Error ex.Message
 
-[<Emit("new Intl.NumberFormat({ style: 'decimal', maximumFractionDigits: $0, minimumFractionDigits: $0 }).format($1)")>]
+[<Emit("new Intl.NumberFormat('cs-CZ',{ style: 'decimal', maximumFractionDigits: $0, minimumFractionDigits: $0 }).format($1)")>]
 let formatDecimal (fractionDigits: int) (value: decimal) = jsNative
 
 

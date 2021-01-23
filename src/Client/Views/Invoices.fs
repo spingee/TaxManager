@@ -126,6 +126,7 @@ let view =
                                 tr [] [
                                     let total = (int i.ManDays) * (int i.Rate)
                                     let vat = i.Vat |> Option.map (fun v -> (total/ 100 * (int v))) |> Option.defaultValue 0
+                                    let totalVat = i.Vat |> Option.map (fun v -> total + (total/ 100 * (int v))) |> Option.defaultValue total
                                     td [] [
                                         str
                                         <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
@@ -134,12 +135,12 @@ let view =
                                     td [] [ str <| i.ManDays.ToString() ]
                                     td [] [
                                         str
-                                        <| (sprintf "%i" total)
+                                        <| (sprintf "%s" (formatDecimal 2 <| decimal total))
                                     ]
-                                    td [] [ ofInt vat ]
+                                    td [] [ str <| sprintf "%s" (formatDecimal 2 <| decimal vat) ]
                                     td [] [
                                         str
-                                        <| (sprintf "%i" (i.Vat |> Option.map (fun v -> total + (total/ 100 * (int v))) |> Option.defaultValue total ))
+                                        <| (sprintf "%s" (formatDecimal 2 <| decimal totalVat))
                                     ]
                                     td [] [
                                         str <| i.Customer.Name.ToString()

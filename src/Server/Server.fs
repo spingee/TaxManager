@@ -178,9 +178,11 @@ let invoiceApi =
                               (fun a ->
                                   let total = a.Rate * uint32 a.ManDays
 
-                                  match Option.ofNullable a.Vat with
-                                  | None -> total
-                                  | Some v -> total + (total / uint32 100 * uint32 v))
+                                //   match Option.ofNullable a.Vat with
+                                //   | None -> total
+                                //   | Some v -> total + (total / uint32 100 * uint32 v)
+                                  total
+                                  )
 
                       let quarterStart, quarterEnd,timeRange =
                           match DateTime.Now.Month with
