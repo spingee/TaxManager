@@ -23,10 +23,8 @@ let documentOutputDir = @"C:\Users\SpinGee\Desktop"
 let documentOutputDir = "./output"
 #endif
 let cultureInfo = CultureInfo("cs-CZ")
-
-
 do CultureInfo.DefaultThreadCurrentCulture <- cultureInfo
-do CultureInfo.DefaultThreadCurrentUICulture <- cultureInfo;
+do CultureInfo.DefaultThreadCurrentUICulture <- cultureInfo
 
 let invoiceApi =
     { addInvoice =
@@ -165,7 +163,7 @@ let invoiceApi =
                   try
                       use db = new LiteDatabase(connectionString)
                       let y = DateTime.Now.AddYears(-1)
-                      let s = DateTime(y.Year,1,1)
+                      let s = DateTime(y.Year, 1, 1)
                       let e = s.AddYears(1)
 
                       let lastYear =
@@ -178,56 +176,91 @@ let invoiceApi =
                               (fun a ->
                                   let total = a.Rate * uint32 a.ManDays
 
-                                //   match Option.ofNullable a.Vat with
-                                //   | None -> total
-                                //   | Some v -> total + (total / uint32 100 * uint32 v)
-                                  total
-                                  )
+                                  //   match Option.ofNullable a.Vat with
+                                  //   | None -> total
+                                  //   | Some v -> total + (total / uint32 100 * uint32 v)
+                                  total)
 
-                      let quarterStart, quarterEnd,timeRange =
+                      let quarterStart, quarterEnd, timeRange =
                           match DateTime.Now.Month with
                           | 1
                           | 2
-                          | 3 -> 10, 12, DateTime.Now.Year - 1,"Q4"
+                          | 3 -> 10, 12, DateTime.Now.Year - 1, "Q4"
                           | 4
                           | 5
-                          | 6 -> 1, 3,DateTime.Now.Year,"Q1"
+                          | 6 -> 1, 3, DateTime.Now.Year, "Q1"
                           | 7
                           | 8
-                          | 9 -> 4, 6,DateTime.Now.Year,"Q2"
+                          | 9 -> 4, 6, DateTime.Now.Year, "Q2"
                           | 10
                           | 11
-                          | 12 -> 7, 9,DateTime.Now.Year, "Q3"
+                          | 12 -> 7, 9, DateTime.Now.Year, "Q3"
                           | _ -> failwith "nonsense"
-                          |> fun (s,e,y,r) -> DateTime(y,s,1),DateTime(y,e,1).AddMonths(1),r
+                          |> fun (s, e, y, r) -> DateTime(y, s, 1), DateTime(y, e, 1).AddMonths(1), r
 
 
                       let lastQuarterBase =
                           db
                               .GetCollection<Dto.Invoice>("invoices")
                               .Query()
-                              .Where(fun i -> i.AccountingPeriod >= quarterStart && i.AccountingPeriod < quarterEnd)
+                              .Where(fun i ->
+                                  i.AccountingPeriod >= quarterStart
+                                  && i.AccountingPeriod < quarterEnd)
                               .ToArray()
+
                       let lastQuarter =
                           lastQuarterBase
-                          |> Array.sumBy
-                              (fun a ->
-                                  a.Rate * uint32 a.ManDays)
+                          |> Array.sumBy (fun a -> a.Rate * uint32 a.ManDays)
+
                       let lastQuarterVat =
                           lastQuarterBase
                           |> Array.sumBy
                               (fun a ->
                                   let total = a.Rate * uint32 a.ManDays
+
                                   match Option.ofNullable a.Vat with
                                   | None -> total
                                   | Some v -> (total / uint32 100 * uint32 v))
 
                       return
-                          { LastYear = {Value = decimal lastYear ; Currency ="CZK"; TimeRange = y.Year.ToString()}
-                            LastQuarter = {Value = decimal lastQuarter ; Currency ="CZK"; TimeRange = timeRange}
-                            LastQuarterVat = {Value = decimal lastQuarterVat ; Currency ="CZK"; TimeRange = timeRange}}
+                          { LastYear =
+                                { Value = decimal lastYear
+                                  Currency = "CZK"
+                                  TimeRange = y.Year.ToString() }
+                            LastQuarter =
+                                { Value = decimal lastQuarter
+                                  Currency = "CZK"
+                                  TimeRange = timeRange }
+                            LastQuarterVat =
+                                { Value = decimal lastQuarterVat
+                                  Currency = "CZK"
+                                  TimeRange = timeRange } }
                           |> Ok
                   with e -> return Error e.Message
+              }
+      generateDocument =
+          fun id ->
+              async {
+                  use db = new LiteDatabase(connectionString)
+
+                  let invoices =
+                      db.GetCollection<Dto.Invoice>("invoices")
+
+                  let invoiceDto = invoices.FindById(BsonValue(id))
+
+                  let samePeriodCount =
+                      invoices
+                          .Query()
+                          .Where(fun f ->
+                              f.AccountingPeriod.Year = invoiceDto.AccountingPeriod.Year
+                              && f.AccountingPeriod.Month = invoiceDto.AccountingPeriod.Month)
+                          .Count()
+
+                  let invoice =
+                      Dto.fromInvoiceDto invoiceDto
+                      |> Result.valueOr failwith
+
+                  return generateExcelData invoice (samePeriodCount + 1)
               } }
 
 let webApp =

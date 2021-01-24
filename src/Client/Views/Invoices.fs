@@ -11,6 +11,7 @@ open Utils
 open Api
 open Fable.FontAwesome
 open Common
+open Fable.Remoting.Client
 
 type Model =
     { Errors: Result<string, string list> option
@@ -22,6 +23,8 @@ type Msg =
     | HandleException of Exception
     | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
     | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
+    | DownloadExcel of Invoice * AsyncOperationStatus<byte[]>
+
 
 type ExtMsg =
     | NoOp
@@ -51,15 +54,17 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
     | HandleException exn ->
         { model with
               Errors = Some(Error [ exn.Message ]) },
-        Cmd.none, NoOp
+        Cmd.none,
+        NoOp
     | LoadInvoices Started ->
-        { model with Invoices = InProgress None },
+        { model with
+              Invoices = InProgress None },
         Cmd.OfAsync.either
             invoiceApi.getInvoices
             ()
             (Finished >> LoadInvoices)
-            (exceptionToResult >> Finished >> LoadInvoices)
-            , NoOp
+            (exceptionToResult >> Finished >> LoadInvoices),
+        NoOp
     | LoadInvoices (Finished result) ->
         { model with
               Invoices =
@@ -70,7 +75,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                   match result with
                   | Ok _ -> None
                   | Error s -> Some(Error [ s ]) },
-        Cmd.none, NoOp
+        Cmd.none,
+        NoOp
     | RemoveInvoice (inv, Started) ->
         { model with
               RemovingInvoice = Some inv },
@@ -78,21 +84,32 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
             invoiceApi.removeInvoice
             inv.Id
             (fun x -> RemoveInvoice(inv, Finished(x)))
-            (fun x -> RemoveInvoice(inv, Finished(exceptionToResult x)))
-            , NoOp
+            (fun x -> RemoveInvoice(inv, Finished(exceptionToResult x))),
+        NoOp
     | RemoveInvoice (inv, Finished (Ok _)) ->
         { model with
               RemovingInvoice = None
-              Errors = Some (Ok "Success")
+              Errors = Some(Ok "Success")
               Invoices =
                   (model.Invoices
                    |> Deferred.map (fun i -> i |> List.filter (fun x -> x <> inv))) },
-        Cmd.none, InvoiceRemoved inv
+        Cmd.none,
+        InvoiceRemoved inv
     | RemoveInvoice (inv, Finished (Error r)) ->
         { model with
               RemovingInvoice = None
-              Errors = Some (Error [r]) },
-        Cmd.none, NoOp
+              Errors = Some(Error [ r ]) },
+        Cmd.none,
+        NoOp
+    | DownloadExcel (inv, Started) ->
+        model,
+        Cmd.OfAsync.perform invoiceApi.generateDocument inv.Id (fun d-> DownloadExcel (inv , Finished d)),
+        NoOp
+    | DownloadExcel (inv, Finished data) ->
+        data.SaveFileAs(sprintf "%s.xlsx" <| getInvoiceNumber inv 1)
+        model,
+        Cmd.none,
+        NoOp
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
 
@@ -119,47 +136,81 @@ let view =
                 tbody [] [
                     yield!
                         model.Invoices
-                        |> Deferred.map (fun invs ->
-                            invs
-                            |> List.sortByDescending (fun x -> x.AccountingPeriod)
-                            |> List.map (fun i ->
-                                tr [] [
-                                    let total = (int i.ManDays) * (int i.Rate)
-                                    let vat = i.Vat |> Option.map (fun v -> (total/ 100 * (int v))) |> Option.defaultValue 0
-                                    let totalVat = i.Vat |> Option.map (fun v -> total + (total/ 100 * (int v))) |> Option.defaultValue total
-                                    td [] [
-                                        str
-                                        <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
-                                    ]
-                                    td [] [ str <| i.Rate.ToString() ]
-                                    td [] [ str <| i.ManDays.ToString() ]
-                                    td [] [
-                                        str
-                                        <| (sprintf "%s" (formatDecimal 2 <| decimal total))
-                                    ]
-                                    td [] [ str <| sprintf "%s" (formatDecimal 2 <| decimal vat) ]
-                                    td [] [
-                                        str
-                                        <| (sprintf "%s" (formatDecimal 2 <| decimal totalVat))
-                                    ]
-                                    td [] [
-                                        str <| i.Customer.Name.ToString()
-                                    ]
-                                    td [] [
-                                        let inProgress =
-                                            model.RemovingInvoice
-                                            |> Option.map (fun ri -> ri = i)
-                                            |> Option.defaultValue false
+                        |> Deferred.map
+                            (fun invs ->
+                                invs
+                                |> List.sortByDescending (fun x -> x.AccountingPeriod)
+                                |> List.map
+                                    (fun i ->
+                                        tr [] [
+                                            let total = (int i.ManDays) * (int i.Rate)
 
-                                        Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
-                                                                           Modifier.IsHidden(Screen.All, inProgress) ]
-                                                        Delete.OnClick(fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
+                                            let vat =
+                                                i.Vat
+                                                |> Option.map (fun v -> (total / 100 * (int v)))
+                                                |> Option.defaultValue 0
 
-                                        Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(Screen.All, not inProgress) ] ] [
-                                            Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
-                                        ]
-                                    ]
-                                ]))
+                                            let totalVat =
+                                                i.Vat
+                                                |> Option.map (fun v -> total + (total / 100 * (int v)))
+                                                |> Option.defaultValue total
+
+                                            td [] [
+                                                str
+                                                <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
+                                            ]
+
+                                            td [] [ str <| i.Rate.ToString() ]
+                                            td [] [ str <| i.ManDays.ToString() ]
+
+                                            td [] [
+                                                str
+                                                <| (sprintf "%s" (formatDecimal 2 <| decimal total))
+                                            ]
+
+                                            td [] [
+                                                str
+                                                <| sprintf "%s" (formatDecimal 2 <| decimal vat)
+                                            ]
+
+                                            td [] [
+                                                str
+                                                <| (sprintf "%s" (formatDecimal 2 <| decimal totalVat))
+                                            ]
+
+                                            td [] [
+                                                str <| i.Customer.Name.ToString()
+                                            ]
+
+                                            td [] [
+                                                let inProgress =
+                                                    model.RemovingInvoice
+                                                    |> Option.map (fun ri -> ri = i)
+                                                    |> Option.defaultValue false
+
+                                                Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
+                                                                                   Modifier.IsHidden(
+                                                                                       Screen.All,
+                                                                                       inProgress
+                                                                                   ) ]
+                                                                Delete.OnClick
+                                                                    (fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
+
+                                                a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started)) ] [
+                                                    Icon.icon [] [
+
+                                                        Fa.i [ Fa.Regular.FileExcel ] []
+                                                    ]
+                                                ]
+
+                                                Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(
+                                                                                 Screen.All,
+                                                                                 not inProgress
+                                                                             ) ] ] [
+                                                    Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
+                                                ]
+                                            ]
+                                        ]))
                         |> Deferred.defaultResolved []
                 ]
             ]
