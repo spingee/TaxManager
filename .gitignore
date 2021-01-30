@@ -15,3 +15,5 @@ release.sh
 *.orig
 *.DotSettings.user
 /src/Server/db/*.db
+*.fs.js
+*.fs.js.map

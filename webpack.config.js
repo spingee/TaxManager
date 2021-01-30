@@ -16,7 +16,7 @@ var CONFIG = {
     // The tags to include the generated JS and CSS will be automatically injected in the HTML template
     // See https://github.com/jantimon/html-webpack-plugin
     indexHtmlTemplate: './src/Client/index.html',
-    fsharpEntry: './src/Client/Client.fsproj',
+    fsharpEntry: './src/Client/App.fs.js',
     outputDir: './deploy/public',
     assetsDir: './src/Client/public',
     devServerPort: 8080,
@@ -67,7 +67,7 @@ module.exports = {
     // with the code because the MiniCssExtractPlugin will extract the
     // CSS in a separate files.
     entry: {
-        app: resolve(CONFIG.fsharpEntry)
+        app: resolve(CONFIG.fsharpEntry)//resolve(CONFIG.fsharpEntry)
     },
     // Add a hash to the output file name in production
     // to prevent browser caching if code changes
@@ -105,7 +105,7 @@ module.exports = {
     devServer: {
         publicPath: '/',
         contentBase: resolve(CONFIG.assetsDir),
-        host: '0.0.0.0',
+        host: 'localhost',
         port: CONFIG.devServerPort,
         proxy: CONFIG.devServerProxy,
         hot: true,
@@ -118,13 +118,9 @@ module.exports = {
     module: {
         rules: [
             {
-                test: /\.fs(x|proj)?$/,
-                use: {
-                    loader: 'fable-loader',
-                    options: {
-                        babel: CONFIG.babel
-                    }
-                }
+                test: /\.js$/,
+                enforce: "pre",
+                use: ["source-map-loader"],
             },
             {
                 test: /\.js$/,

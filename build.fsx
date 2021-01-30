@@ -13,6 +13,7 @@ Target.initEnvironment ()
 
 let sharedPath = Path.getFullName "./src/Shared"
 let serverPath = Path.getFullName "./src/Server"
+let clientPath = Path.getFullName "./src/Client"
 let deployDir = Path.getFullName "./deploy"
 let sharedTestsPath = Path.getFullName "./tests/Shared"
 let serverTestsPath = Path.getFullName "./tests/Server"
@@ -58,7 +59,7 @@ Target.create "InstallClient" (fun _ -> npm "install" ".")
 
 Target.create "Bundle" (fun _ ->
     dotnet (sprintf "publish -c Release -o \"%s\"" deployDir) serverPath
-    npm "run build" ".")
+    dotnet "fable --run webpack" clientPath)
 
 Target.create "Azure" (fun _ ->
     let web =
@@ -78,6 +79,7 @@ Target.create "Azure" (fun _ ->
     |> ignore)
 
 Target.create "Run" (fun _ ->
+    //can be done with webpack: webpack-dev-server --open
     let openBrowser =
         async {
             System.Threading.Thread.Sleep(5000)
@@ -88,8 +90,9 @@ Target.create "Run" (fun _ ->
 
     dotnet "build" sharedPath
     [ async { dotnet "watch run" serverPath }
-      async { npm "run start" "." }
-      openBrowser ]
+      async { dotnet "fable watch --sourceMaps --run webpack-dev-server --open" clientPath }
+      //openBrowser
+      ]
     |> Async.Parallel
     |> Async.RunSynchronously
     |> ignore)
