@@ -14,9 +14,12 @@ open Elmish
 open FsToolkit.ErrorHandling
 open Api
 open Common
+open Elmish.Toastr
 
 let monthSelectPlugin (x: obj): obj -> obj =
     importDefault "flatpickr/dist/plugins/monthSelect"
+
+
 
 type Model =
     { ManDays: Validated<uint8>
@@ -66,6 +69,8 @@ type ExtMsg =
     | NoOp
     | InvoiceAdded of Invoice
 
+
+
 let init () =
     let submodel, cmd = Customer.init ()
 
@@ -100,7 +105,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                   | Ok a -> Some(Ok "Success")
                   | Error s -> Some(Error [ s ])
               IsReadOnly = false },
-        Cmd.none,
+        toastMessage result,
         match result with
         | Ok id ->
             let inv = { inv with Id = id }
@@ -404,7 +409,6 @@ let view =
                         ]
                     ]
                 ]
-                Common.notification model.Result
             ]
             Customer.view
                 { Model = model.CustomerModel

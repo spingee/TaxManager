@@ -4,7 +4,7 @@ open Utils
 open Fable.Core
 open Fulma
 open Fable.React
-
+open Elmish.Toastr
 
 [<Erase>]
 type Html =
@@ -73,3 +73,20 @@ let notification =
                      ])
             ]]
     | None _ -> Html.none
+
+let toastMessage =
+    function
+    | Ok _ ->
+        Toastr.message "Success"
+        |> Toastr.position TopRight
+        |> Toastr.timeout 2000
+        |> Toastr.hideEasing Easing.Swing
+        |> Toastr.showCloseButton
+        |> Toastr.success
+    | Error e ->
+        Toastr.message e
+        |> Toastr.position TopRight
+        |> Toastr.timeout 0
+        |> Toastr.extendedTimout 0
+        |> Toastr.showCloseButton
+        |> Toastr.error

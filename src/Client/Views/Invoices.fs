@@ -93,13 +93,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
               Invoices =
                   (model.Invoices
                    |> Deferred.map (fun i -> i |> List.filter (fun x -> x <> inv))) },
-        Cmd.none,
+        toastMessage <| Ok 1,
         InvoiceRemoved inv
     | RemoveInvoice (inv, Finished (Error r)) ->
         { model with
               RemovingInvoice = None
               Errors = Some(Error [ r ]) },
-        Cmd.none,
+        toastMessage <| Error r,
         NoOp
     | DownloadExcel (inv, Started) ->
         model,
@@ -214,5 +214,4 @@ let view =
                         |> Deferred.defaultResolved []
                 ]
             ]
-            notification model.Errors
         ]
