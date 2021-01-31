@@ -98,9 +98,15 @@ Target.create "Run" (fun _ ->
     |> ignore)
 
 Target.create "CreateDockerImage" (fun _ ->
+    let minVer =
+        CreateProcess.fromRawCommand "minver" []
+        |> CreateProcess.redirectOutput
+        |> CreateProcess.mapResult (fun r-> r.Output.Trim())
+        |> Proc.run
+
     let result =
         CreateProcess.fromRawCommandLine "docker"
-        <| sprintf "build -t %s/%s ." dockerUser dockerImageName
+        <| sprintf "build -t %s/%s:%s ." dockerUser dockerImageName minVer.Result
         |> Proc.run
 
     if result.ExitCode <> 0 then failwith "Docker build failed")

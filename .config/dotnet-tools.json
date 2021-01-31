@@ -19,6 +19,12 @@
       "commands": [
         "fable"
       ]
+    },
+    "minver-cli": {
+      "version": "2.4.0",
+      "commands": [
+        "minver"
+      ]
     }
   }
 }
