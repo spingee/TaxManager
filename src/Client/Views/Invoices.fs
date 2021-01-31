@@ -12,6 +12,7 @@ open Api
 open Fable.FontAwesome
 open Common
 open Fable.Remoting.Client
+open Elmish.SweetAlert
 
 type Model =
     { Errors: Result<string, string list> option
@@ -22,6 +23,7 @@ type Msg =
     | AddInvoice of Invoice
     | HandleException of Exception
     | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
+    | RemoveInvoiceConfirm of Invoice
     | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
     | DownloadExcel of Invoice * AsyncOperationStatus<byte[]>
 
@@ -77,6 +79,19 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                   | Error s -> Some(Error [ s ]) },
         Cmd.none,
         NoOp
+    | RemoveInvoiceConfirm inv ->
+        let handleConfirm = function
+        | ConfirmAlertResult.Confirmed -> RemoveInvoice (inv,Started)
+        | ConfirmAlertResult.Dismissed reason -> unbox null
+
+        let confirmAlert =
+            ConfirmToastAlert("Are you sure?", handleConfirm)
+                .Title("Warning")
+                .ShowCloseButton(false)
+                .Type(AlertType.Warning)
+                .ShowCloseButton(true)
+                .Timeout(10000)
+        model,SweetAlert.Run(confirmAlert),NoOp
     | RemoveInvoice (inv, Started) ->
         { model with
               RemovingInvoice = Some inv },
@@ -113,7 +128,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
 
-let elmishView name render =
+let private elmishView name render =
     FunctionComponent.Of(render, name, equalsButFunctions)
 
 let view =
@@ -194,7 +209,7 @@ let view =
                                                                                        inProgress
                                                                                    ) ]
                                                                 Delete.OnClick
-                                                                    (fun _ -> dispatch (RemoveInvoice(i, Started))) ] []
+                                                                    (fun _ -> dispatch (RemoveInvoiceConfirm i)) ] []
 
                                                 a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started)) ] [
                                                     Icon.icon [] [
