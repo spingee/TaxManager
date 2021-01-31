@@ -203,27 +203,24 @@ let view =
                                                     |> Option.map (fun ri -> ri = i)
                                                     |> Option.defaultValue false
 
-                                                Delete.delete [ Delete.Modifiers [ Modifier.BackgroundColor IsDanger
-                                                                                   Modifier.IsHidden(
-                                                                                       Screen.All,
-                                                                                       inProgress
-                                                                                   ) ]
-                                                                Delete.OnClick
-                                                                    (fun _ -> dispatch (RemoveInvoiceConfirm i)) ] []
 
-                                                a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started)) ] [
-                                                    Icon.icon [] [
-
-                                                        Fa.i [ Fa.Regular.FileExcel ] []
+                                                a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started))
+                                                    Props.Title "Download excel"] [
+                                                    Icon.icon [Icon.Modifiers[Modifier.TextColor IsPrimary]] [
+                                                        Fa.i [ Fa.Regular.FileExcel; ] []
                                                     ]
                                                 ]
 
-                                                Icon.icon [ Icon.Modifiers [ Modifier.IsHidden(
-                                                                                 Screen.All,
-                                                                                 not inProgress
-                                                                             ) ] ] [
-                                                    Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
+                                                a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch (RemoveInvoiceConfirm i))
+                                                    Props.Title "Delete invoice" ] [
+                                                    Icon.icon [Icon.Modifiers[Modifier.TextColor IsDanger]] [
+                                                        match inProgress with
+                                                        | false -> Fa.i [ Fa.Solid.TrashAlt ] []
+                                                        | true -> Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
+                                                    ]
                                                 ]
+
+
                                             ]
                                         ]))
                         |> Deferred.defaultResolved []
