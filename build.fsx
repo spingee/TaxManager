@@ -99,11 +99,12 @@ Target.create "Run" (fun _ ->
 
 Target.create "CreateDockerImage" (fun _ ->
     let minVer =
-        CreateProcess.fromRawCommand "minver" []
+        CreateProcess.fromRawCommand "dotnet" ["minver"]
         |> CreateProcess.redirectOutput
         |> CreateProcess.mapResult (fun r-> r.Output.Trim())
         |> Proc.run
-
+    // let minVer =
+    //     DotNet.exec id "minver" ""
     let result =
         CreateProcess.fromRawCommandLine "docker"
         <| sprintf "build -t %s/%s:%s ." dockerUser dockerImageName minVer.Result
@@ -130,6 +131,7 @@ open Fake.Core.TargetOperators
 
 "Clean" ==> "InstallClient" ==> "RunTests"
 
-"Bundle" ==> "CreateDockerImage"
+"Clean"
+==> "InstallClient" ==> "Bundle" ==> "CreateDockerImage"
 
 Target.runOrDefaultWithArguments "Bundle"
