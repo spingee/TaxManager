@@ -107,7 +107,7 @@ Target.create "CreateDockerImage" (fun _ ->
     //     DotNet.exec id "minver" ""
     let result =
         CreateProcess.fromRawCommandLine "docker"
-        <| sprintf "build -t %s/%s:%s ." dockerUser dockerImageName minVer.Result
+        <| $"build -t {dockerUser}/{dockerImageName}:{minVer.Result} -t {dockerUser}/{dockerImageName}:latest ."
         |> Proc.run
 
     if result.ExitCode <> 0 then failwith "Docker build failed")

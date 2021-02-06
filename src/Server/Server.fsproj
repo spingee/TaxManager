@@ -17,8 +17,5 @@
     </Content>
     <None Include="paket.references" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="GemBox.Spreadsheet" Version="47.0.1000" />
-  </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
