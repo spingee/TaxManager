@@ -12,3 +12,4 @@ FsToolkit.ErrorHandling
 Fable.Reaction
 Elmish.Toastr
 Elmish.SweetAlert
+Thoth.Elmish.Debouncer

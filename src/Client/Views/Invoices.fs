@@ -4,8 +4,8 @@ module Invoices
 open System
 open Elmish
 open Fable.React
+open Fable.React.Props
 open Fulma
-open Shared
 open Shared.Invoice
 open Utils
 open Api
@@ -26,6 +26,7 @@ type Msg =
     | RemoveInvoiceConfirm of Invoice
     | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
     | DownloadExcel of Invoice * AsyncOperationStatus<byte[]>
+
 
 
 type ExtMsg =
@@ -204,15 +205,15 @@ let view =
                                                     |> Option.defaultValue false
 
 
-                                                a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started))
-                                                    Props.Title "Download excel"] [
+                                                a [ OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started))
+                                                    Title "Download excel"] [
                                                     Icon.icon [Icon.Modifiers[Modifier.TextColor IsPrimary]] [
                                                         Fa.i [ Fa.Regular.FileExcel; ] []
                                                     ]
                                                 ]
 
-                                                a [ Props.DOMAttr.OnClick(fun e -> e.preventDefault(); dispatch (RemoveInvoiceConfirm i))
-                                                    Props.Title "Delete invoice" ] [
+                                                a [ OnClick(fun e -> e.preventDefault(); dispatch (RemoveInvoiceConfirm i))
+                                                    Title "Delete invoice" ] [
                                                     Icon.icon [Icon.Modifiers[Modifier.TextColor IsDanger]] [
                                                         match inProgress with
                                                         | false -> Fa.i [ Fa.Solid.TrashAlt ] []

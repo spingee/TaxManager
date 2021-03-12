@@ -14,7 +14,6 @@ open Elmish
 open FsToolkit.ErrorHandling
 open Api
 open Common
-open Elmish.Toastr
 
 let monthSelectPlugin (x: obj): obj -> obj =
     importDefault "flatpickr/dist/plugins/monthSelect"
@@ -34,7 +33,8 @@ type Model =
       CreatingCustomer: bool
       AddingInvoice: Deferred<unit>
       Result: Result<string, string list> option
-      CustomerModel: Customer.Model }
+      CustomerModel: Customer.Model
+      SearchBoxModel: SearchBox.Model }
 
 let isValid input =
     let { Model.ManDays = mandays
@@ -64,6 +64,7 @@ type Msg =
     | CustomerMsg of Customer.Msg
     | Select of string
     | VatApplicable of bool
+    | SearchBoxMsg of SearchBox.Msg
 
 type ExtMsg =
     | NoOp
@@ -73,6 +74,7 @@ type ExtMsg =
 
 let init () =
     let submodel, cmd = Customer.init ()
+    let searchBoxModel, searchBoxCmd = SearchBox.init()
 
     { Rate = Validated.success "6000" <| uint32 6000
       ManDays = Validated.success "20" 20uy
@@ -88,11 +90,13 @@ let init () =
       Result = None
       CustomerModel = submodel
       SelectedCustomer = None
-      CreatingCustomer = false },
+      CreatingCustomer = false
+      SearchBoxModel = searchBoxModel },
 
 
     Cmd.batch [ Cmd.map CustomerMsg cmd
-                Cmd.ofMsg (LoadCustomers Started) ]
+                Cmd.ofMsg (LoadCustomers Started)
+                Cmd.map SearchBoxMsg searchBoxCmd ]
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
     let modelInvoiceInput = model
@@ -267,6 +271,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                                     | true -> Validated.success "21" <| Some 21uy
                                     | false -> Validated.success "" <| None }
                            , Cmd.none, NoOp
+    | SearchBoxMsg msg ->
+        let newSubModel, cmd = SearchBox.update msg model.SearchBoxModel
+
+        { model with
+              SearchBoxModel = newSubModel },
+        Cmd.map SearchBoxMsg cmd,
+        NoOp
 
 
 
@@ -329,7 +340,8 @@ let view =
                       Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
 
                 // AutoComplete.textBox { Search= invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=400 }
-
+                SearchBox.view { Model = model.SearchBoxModel
+                                 Dispatch = dispatch << SearchBoxMsg }
                 Field.div [ Field.IsExpanded ] [
                     Label.label [] [ str "Customer" ]
                     Field.div [ Field.HasAddons ] [
