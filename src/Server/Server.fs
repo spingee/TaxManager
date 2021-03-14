@@ -13,6 +13,8 @@ open FsToolkit.ErrorHandling
 open System.IO
 open MassTransit
 open System.Globalization
+open Giraffe
+open FSharp.Control.Tasks.ContextInsensitive
 //open System.Linq
 
 let connectionString =
@@ -25,6 +27,10 @@ let documentOutputDir = "./output"
 let cultureInfo = CultureInfo("cs-CZ")
 do CultureInfo.DefaultThreadCurrentCulture <- cultureInfo
 do CultureInfo.DefaultThreadCurrentUICulture <- cultureInfo
+do SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
+
+let getInvoiceFileName year month index =
+    sprintf "Faktura - %i-%02i-%02i" year month index
 
 let invoiceApi =
     { addInvoice =
@@ -53,8 +59,7 @@ let invoiceApi =
                       let outputFile =
                           Path.Combine(
                               documentOutputDir,
-                              sprintf
-                                  "Faktura - %i-%02i-%02i"
+                              getInvoiceFileName
                                   invoice.AccountingPeriod.Year
                                   invoice.AccountingPeriod.Month
                                   indexNumber
@@ -237,31 +242,44 @@ let invoiceApi =
                                   TimeRange = timeRange } }
                           |> Ok
                   with e -> return Error e.Message
-              }
-      generateDocument =
-          fun id ->
-              async {
-                  use db = new LiteDatabase(connectionString)
+              }}
 
-                  let invoices =
-                      db.GetCollection<Dto.Invoice>("invoices")
+let generateExcelHandler (id:Guid) =
+    warbler
+        (fun (_, ctx) ->
 
-                  let invoiceDto = invoices.FindById(BsonValue(id))
+            use db = new LiteDatabase(connectionString)
 
-                  let samePeriodCount =
-                      invoices
-                          .Query()
-                          .Where(fun f ->
-                              f.AccountingPeriod.Year = invoiceDto.AccountingPeriod.Year
-                              && f.AccountingPeriod.Month = invoiceDto.AccountingPeriod.Month)
-                          .Count()
+            let invoices =
+                db.GetCollection<Dto.Invoice>("invoices")
 
-                  let invoice =
-                      Dto.fromInvoiceDto invoiceDto
-                      |> Result.valueOr failwith
 
-                  return generateExcelData invoice (samePeriodCount + 1)
-              } }
+            let invoiceDto = invoices.FindById(BsonValue(id))
+
+            let index =
+                invoices
+                    .Query()
+                    .Where(fun f ->
+                        f.AccountingPeriod.Year = invoiceDto.AccountingPeriod.Year
+                        && f.AccountingPeriod.Month = invoiceDto.AccountingPeriod.Month)
+                    .OrderBy(fun inv -> inv.Inserted)
+                    .ToArray()
+                    |> Array.findIndex (fun inv -> inv.Id = id)
+
+            let invoice =
+                Dto.fromInvoiceDto invoiceDto
+                |> Result.valueOr failwith
+
+            let fileName =
+                getInvoiceFileName invoiceDto.AccountingPeriod.Year invoiceDto.AccountingPeriod.Month (index + 1)
+
+            ctx.SetHttpHeader "Content-Disposition" $"inline; filename=\"{fileName}.xlsx\""
+            ctx.SetHttpHeader "Content-Type" "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+            let stream =
+                new MemoryStream(generateExcelData invoice (index + 1))
+
+            streamData false stream None None)
 
 let webApp =
     Remoting.createApi ()
@@ -269,16 +287,21 @@ let webApp =
     |> Remoting.fromValue invoiceApi
     |> Remoting.buildHttpHandler
 
+let router =
+    choose [ routef "/api/generateInvoiceDocument/%O" generateExcelHandler
+             routeStartsWith "/api" >=> webApp
+             setStatusCode 404 >=> text "Not found" ]
+
 let app =
     application {
         url "http://0.0.0.0:8085"
-        use_router webApp
+        use_router router
         memory_cache
         use_static "public"
         use_gzip
 
     }
 
-SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
+
 //FontSettings.FontsBaseDirectory = "./fonts" |> ignore
 run app

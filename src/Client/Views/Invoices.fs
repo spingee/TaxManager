@@ -25,10 +25,6 @@ type Msg =
     | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
     | RemoveInvoiceConfirm of Invoice
     | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
-    | DownloadExcel of Invoice * AsyncOperationStatus<byte[]>
-
-
-
 type ExtMsg =
     | NoOp
     | InvoiceRemoved of Invoice
@@ -117,15 +113,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
               Errors = Some(Error [ r ]) },
         toastMessage <| Error r,
         NoOp
-    | DownloadExcel (inv, Started) ->
-        model,
-        Cmd.OfAsync.perform invoiceApi.generateDocument inv.Id (fun d-> DownloadExcel (inv , Finished d)),
-        NoOp
-    | DownloadExcel (inv, Finished data) ->
-        data.SaveFileAs(sprintf "%s.xlsx" <| getInvoiceNumber inv 1)
-        model,
-        Cmd.none,
-        NoOp
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
 
@@ -205,7 +192,8 @@ let view =
                                                     |> Option.defaultValue false
 
 
-                                                a [ OnClick(fun e -> e.preventDefault(); dispatch <| DownloadExcel (i ,Started))
+                                                a [
+                                                    Href (sprintf "/api/generateInvoiceDocument/%O" i.Id)
                                                     Title "Download excel"] [
                                                     Icon.icon [Icon.Modifiers[Modifier.TextColor IsPrimary]] [
                                                         Fa.i [ Fa.Regular.FileExcel; ] []
