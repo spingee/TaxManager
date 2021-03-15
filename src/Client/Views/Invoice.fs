@@ -15,7 +15,7 @@ open FsToolkit.ErrorHandling
 open Api
 open Common
 
-let monthSelectPlugin (x: obj): obj -> obj =
+let monthSelectPlugin (x: obj) : obj -> obj =
     importDefault "flatpickr/dist/plugins/monthSelect"
 
 
@@ -62,7 +62,6 @@ type Msg =
     | LoadCustomers of AsyncOperationStatus<Result<Customer list, string>>
     | BeginCreateCustomer
     | CustomerMsg of Customer.Msg
-    | Select of string
     | VatApplicable of bool
     | SearchBoxMsg of SearchBox.Msg
 
@@ -74,7 +73,9 @@ type ExtMsg =
 
 let init () =
     let submodel, cmd = Customer.init ()
-    let searchBoxModel, searchBoxCmd = SearchBox.init()
+
+    let searchBoxModel, searchBoxCmd =
+        SearchBox.init invoiceApi.searchOrderNumber
 
     { Rate = Validated.success "6000" <| uint32 6000
       ManDays = Validated.success "20" 20uy
@@ -98,7 +99,7 @@ let init () =
                 Cmd.ofMsg (LoadCustomers Started)
                 Cmd.map SearchBoxMsg searchBoxCmd ]
 
-let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
+let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
     let modelInvoiceInput = model
 
     match msg with
@@ -264,19 +265,31 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                   | Error s -> Some(Error [ s ]) },
         Cmd.none,
         NoOp
-    | Select s -> model, Cmd.ofMsg (SetOrderNumber s), NoOp
-    | VatApplicable b -> { model with
-                               VatApplicable = b
-                               Vat= match b with
-                                    | true -> Validated.success "21" <| Some 21uy
-                                    | false -> Validated.success "" <| None }
-                           , Cmd.none, NoOp
+    | VatApplicable b ->
+        { model with
+              VatApplicable = b
+              Vat =
+                  match b with
+                  | true -> Validated.success "21" <| Some 21uy
+                  | false -> Validated.success "" <| None },
+        Cmd.none,
+        NoOp
     | SearchBoxMsg msg ->
-        let newSubModel, cmd = SearchBox.update msg model.SearchBoxModel
+        let newSubModel, subCmd =
+            SearchBox.update msg model.SearchBoxModel
+
+        let cmd =
+            match msg with
+            | SearchBox.ChangeValue txt
+            | SearchBox.SelectText txt -> Cmd.ofMsg (SetOrderNumber txt)
+
+            | _ -> Cmd.none
+
 
         { model with
               SearchBoxModel = newSubModel },
-        Cmd.map SearchBoxMsg cmd,
+        Cmd.batch [ Cmd.map SearchBoxMsg subCmd
+                    cmd ],
         NoOp
 
 
@@ -318,10 +331,10 @@ let view =
                                               Flatpickr.custom
                                                   "plugins"
                                                   [| monthSelectPlugin (
-                                                      {| shorthand = true
-                                                         dateFormat = "F Y"
-                                                         altFormat = "F Y" |}
-                                                  ) |]
+                                                         {| shorthand = true
+                                                            dateFormat = "F Y"
+                                                            altFormat = "F Y" |}
+                                                     ) |]
 
                                                   true
                                               Flatpickr.Locale Flatpickr.Locales.czech
@@ -340,8 +353,16 @@ let view =
                       Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
 
                 // AutoComplete.textBox { Search= invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=400 }
-                SearchBox.view { Model = model.SearchBoxModel
-                                 Dispatch = dispatch << SearchBoxMsg }
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "Order number" ]
+                        SearchBox.view
+                            { Model =
+                                  { model.SearchBoxModel with
+                                        UserInput = model.OrderNumber.Raw }
+                              Dispatch = dispatch << SearchBoxMsg }
+                    ]
+                ]
                 Field.div [ Field.IsExpanded ] [
                     Label.label [] [ str "Customer" ]
                     Field.div [ Field.HasAddons ] [
@@ -413,10 +434,10 @@ let view =
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [] [
-                        Button.a [ Button.Color IsPrimary
-                                   Button.IsLoading model.IsReadOnly
-                                   //Button.Disabled(isModelValid model |> not)
-                                   Button.OnClick(fun _ -> dispatch (AddInvoice Started)) ] [
+                        Button.button [ Button.Color IsPrimary
+                                        Button.IsLoading model.IsReadOnly
+                                        //Button.Disabled(isModelValid model |> not)
+                                        Button.OnClick(fun _ -> dispatch (AddInvoice Started)) ] [
                             str "Add"
                         ]
                     ]

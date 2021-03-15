@@ -288,7 +288,7 @@ let webApp =
     |> Remoting.buildHttpHandler
 
 let router =
-    choose [ routef "/api/generateInvoiceDocument/%O" generateExcelHandler
+    choose [ GET >=> routef "/api/generateInvoiceDocument/%O" generateExcelHandler
              routeStartsWith "/api" >=> webApp
              setStatusCode 404 >=> text "Not found" ]
 

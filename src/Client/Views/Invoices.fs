@@ -201,6 +201,7 @@ let view =
                                                 ]
 
                                                 a [ OnClick(fun e -> e.preventDefault(); dispatch (RemoveInvoiceConfirm i))
+                                                    Href "javascript:void(0)"
                                                     Title "Delete invoice" ] [
                                                     Icon.icon [Icon.Modifiers[Modifier.TextColor IsDanger]] [
                                                         match inProgress with

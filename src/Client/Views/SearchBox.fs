@@ -2,7 +2,6 @@
 module SearchBox
 
 
-open System.Data
 open Elmish
 open Fable.React
 open Fulma
@@ -10,8 +9,8 @@ open Thoth.Elmish
 open System
 open Fable.React.Props
 open Fable.Core.JsInterop
-open Browser.Dom
-
+open Utils
+open Common
 
 type State =
     | Initial
@@ -21,19 +20,24 @@ type State =
 type Model =
     { Debouncer: Debouncer.State
       UserInput: string
-      Dictionary: string list
-      Result: string array
+      Result: Deferred<string array>
       ActiveIndex: int option
       SelectedText: string option
-      State: State }
+      State: State
+      Search: string -> Async<Result<string list, string>>
+       }
 
 let private getActiveItem model =
-    match model.ActiveIndex with
-    | None -> None
-    | Some i -> Some model.Result.[i]
+    match model.ActiveIndex, model.Result with
+    | Some i,Resolved arr -> Some arr.[i]
+    | _,_ -> None
+
 
 let private isActive model =
-    model.Result.Length > 0
+    match model.Result with
+    | Resolved arr -> arr.Length > 0
+    | _ -> false
+
 
 
 type Direction =
@@ -44,27 +48,19 @@ type Msg =
     | DebouncerSelfMsg of Debouncer.SelfMessage<Msg>
     | ChangeValue of string
     | EndOfInput
-    | Reset
     | SelectText of string
     | MoveList of Direction
     | Close
+    | Search of AsyncOperationStatus<Result<string list, string>>
 
-let init () =
+let init search =
     { Debouncer = Debouncer.create ()
       UserInput = ""
-      Dictionary =
-          [ "lol"
-            "stvol"
-            "asdja"
-            "asdas adasd"
-            "alol"
-            "bstvol"
-            "basdja"
-            "aaasdas adasd" ]
       SelectedText = None
-      Result = [||]
+      Result = HasNotStartedYet
       ActiveIndex = None
-      State = State.Initial },
+      State = Initial
+      Search = search },
     Cmd.none
 
 let update msg model =
@@ -76,7 +72,7 @@ let update msg model =
 
         { model with
               UserInput = newValue
-              State = State.IsTyping
+              State = IsTyping
               Debouncer = debouncerModel },
         Cmd.batch [ Cmd.map DebouncerSelfMsg debouncerCmd ]
 
@@ -98,37 +94,44 @@ let update msg model =
         //                     Debouncer = debouncerModel }, Cmd.batch [ Cmd.map DebouncerSelfMsg debouncerCmd ]
 
         { model with
-              State = State.StoppedTyping
-              Result =
-                  (model.Dictionary
-                   |> List.filter (fun s -> s.StartsWith(model.UserInput)))
-                  |> Array.ofList },
-        Cmd.none
+              State = StoppedTyping },
+        Cmd.ofMsg(Search Started)
 
     | Close ->
         { model with
-              Result = [||]
+              Result = HasNotStartedYet
               ActiveIndex = None
-              State = State.Initial },
+              State = Initial },
         Cmd.none
     | SelectText str ->
         { model with
               UserInput = str
-              Result = [||]
+              Result = HasNotStartedYet
               ActiveIndex = None
-              State = State.Initial },
+              State = Initial },
         Cmd.none
     | MoveList dir ->
         let index =
             match dir, model.ActiveIndex, model.Result with
-            | _, _, [||] -> None
-            | Up, Some i, _ -> Some <| (i + model.Result.Length - 1) % model.Result.Length
-            | Down, Some i, _ -> Some <| (i + 1) % model.Result.Length
-            | Up, None, _ -> Some <| model.Result.Length - 1
+            | _, _, (InProgress _|HasNotStartedYet| Resolved [||]) -> None
+            | Up, Some i, Resolved result -> Some <| (i + result.Length - 1) % result.Length
+            | Down, Some i, Resolved result -> Some <| (i + 1) % result.Length
+            | Up, None, Resolved result -> Some <| result.Length - 1
             | Down, None, _ -> Some <| 0
 
 
         { model with ActiveIndex = index }, Cmd.none
+    | Search Started ->
+        model,
+        Cmd.OfAsync.either
+            model.Search
+            model.UserInput (Finished >> Search)
+            (exceptionToResult >> Finished >> Search)
+    | Search (Finished result) ->
+        match result with
+        | Ok res -> {model with Result = Resolved (Array.ofList res)},Cmd.none
+        | _ -> model,Cmd.none
+
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
 
@@ -140,12 +143,12 @@ let view =
     <| fun { Model = model; Dispatch = dispatch } ->
 
 
-        Dropdown.dropdown [ Dropdown.Option.IsActive(isActive model) ] [
+        Dropdown.dropdown [ Dropdown.IsActive(isActive model); Dropdown.Props [ Style [ Display DisplayOptions.Block ] ] ] [
             div [] [
                 //Control.Option.IsLoading model.Loading
-                Control.div [] [
+                Control.div [ Control.IsExpanded] [
                     Input.input [ Input.Option.Placeholder "Enter query ..."
-                                  Input.OnChange(fun ev -> dispatch (ChangeValue ev.Value))
+                                  Input.OnChange(fun ev -> dispatch (ChangeValue (ev.Value)))
                                   Input.Value model.UserInput
                                   match model.SelectedText with
                                   | Some s -> Input.Option.Value s
@@ -154,40 +157,45 @@ let view =
                                                     match ev.key with
                                                     | "ArrowDown" ->
                                                          if (isActive model) then  dispatch (MoveList Down)
-                                                         else dispatch EndOfInput
+                                                         else dispatch (EndOfInput)
                                                     | "ArrowUp" ->
                                                          if (isActive model) then dispatch (MoveList Up)
-                                                         else dispatch EndOfInput
+                                                         else dispatch (EndOfInput)
                                                     | "Enter" ->
-                                                        match model.ActiveIndex with
-                                                        | Some i -> dispatch (SelectText(model.Result.[i]))
-                                                        | _ -> ()
+                                                        match model.ActiveIndex,model.Result with
+                                                        | Some i,Resolved result -> dispatch (SelectText(result.[i]))
+                                                        | _,_ -> ()
                                                     | "Escape" -> if (isActive model) then dispatch Close
 
-                                                    | _ -> ()) ] ]
+                                                    | _ -> ())
+                                                OnBlur (fun _ -> dispatch Close)] ]
                 ]
             ]
 
             Dropdown.menu [ Props [ Role "menu" ] ] [
                 Dropdown.content [] [
                     yield!
-                        model.Result
-                        |> Array.mapi (fun i s ->
-                            let isActive =
-                                model.ActiveIndex
-                                |> Option.map (fun ai -> ai = i)
-                                |> Option.defaultValue false
+                        model.Result |>
+                            Deferred.map (fun res ->
+                                res
+                                |> Array.mapi (fun i s ->
+                                    let isActive =
+                                        model.ActiveIndex
+                                        |> Option.map (fun ai -> ai = i)
+                                        |> Option.defaultValue false
 
-                            a [ Href "#"
-                                Class
-                                    (match isActive with
-                                     | false -> "dropdown-item"
-                                     | true -> "dropdown-item is-active")
-                                OnClick(fun ev ->
-                                    ev.preventDefault ()
-                                    dispatch (SelectText ev.target?textContent)) ] [
-                                str s
-                            ])
+                                    a [ Href "#"
+                                        Class
+                                            (match isActive with
+                                             | false -> "dropdown-item"
+                                             | true -> "dropdown-item is-active")
+                                        OnClick(fun ev ->
+                                            ev.preventDefault ()
+                                            dispatch (SelectText ev.target?textContent)) ] [
+                                        str s
+                                    ])
+                                )
+                            |> Deferred.defaultResolved  [|Html.none|]
                 ]
             ]
         ]

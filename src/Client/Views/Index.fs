@@ -23,7 +23,7 @@ type Msg =
 
 
 
-let init (): Model * Cmd<Msg> =
+let init () : Model * Cmd<Msg> =
     let invSubModel, invCmd = Invoice.init ()
     let invsSubModel, invsCmd = Invoices.init ()
 
@@ -41,19 +41,19 @@ let init (): Model * Cmd<Msg> =
 
     model, cmd
 
-let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
+let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
     | InvoiceMsg msg ->
         let newSubModel, cmd, extMsg = Invoice.update msg model.InvoiceModel
 
         { model with
               InvoiceModel = newSubModel },
-        Cmd.batch [
-            Cmd.map InvoiceMsg cmd
-            Cmd.ofMsg (LoadTotals Started)
-            match extMsg with
-            | Invoice.InvoiceAdded inv ->  Cmd.ofMsg (InvoicesMsg(Invoices.AddInvoice inv))
-            | _ -> Cmd.none]
+        Cmd.batch [ Cmd.map InvoiceMsg cmd
+                    match extMsg with
+                    | Invoice.InvoiceAdded inv ->
+                        Cmd.batch [ Cmd.ofMsg (InvoicesMsg(Invoices.AddInvoice inv))
+                                    Cmd.ofMsg (LoadTotals Started) ]
+                    | _ -> Cmd.none ]
     | InvoicesMsg msg ->
         let newSubModel, cmd, extMsg = Invoices.update msg model.InvoicesModel
 
