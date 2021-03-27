@@ -189,8 +189,9 @@ let view =
                                             (match isActive with
                                              | false -> "dropdown-item"
                                              | true -> "dropdown-item is-active")
-                                        OnClick(fun ev ->
-                                            ev.preventDefault ()
+                                        OnMouseDown(fun ev ->
+                                            ev.stopPropagation()
+                                            ev.preventDefault()
                                             dispatch (SelectText ev.target?textContent)) ] [
                                         str s
                                     ])

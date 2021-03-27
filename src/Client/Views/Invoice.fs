@@ -346,13 +346,8 @@ let view =
                     model.ManDays
                     [ Input.Placeholder "Total number of man days"
                       Input.OnChange(fun x -> SetManDays x.Value |> dispatch) ]
-                createTextField
-                    "Order number"
-                    model.OrderNumber
-                    [ Input.Placeholder "Order number"
-                      Input.OnChange(fun x -> SetOrderNumber x.Value |> dispatch) ]
 
-                // AutoComplete.textBox { Search= invoiceApi.searchOrderNumber; Dispatch = Select >> dispatch; DebounceTimeout=400 }
+
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Order number" ]
