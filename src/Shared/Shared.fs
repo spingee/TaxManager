@@ -63,7 +63,7 @@ module Invoice =
     type IInvoiceApi =
         { addInvoice: Invoice -> Async<Result<Guid, string>>
           getCustomers: unit -> Async<Result<Customer list, string>>
-          getInvoices: unit -> Async<Result<Invoice list, string>>
+          getInvoices: int -> int -> Async<Result<Invoice list * int, string>>
           removeInvoice: Guid -> Async<Result<unit, string>>
           searchOrderNumber: string -> Async<Result<string list, string>>
           getTotals: unit -> Async<Result<Totals, string>> }

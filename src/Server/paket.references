@@ -5,3 +5,4 @@ LiteDB
 FsToolkit.ErrorHandling
 MinVer
 NewId
+Microsoft.AspNetCore.Authentication.Certificate

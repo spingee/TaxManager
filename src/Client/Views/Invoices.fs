@@ -14,22 +14,35 @@ open Common
 open Fable.Remoting.Client
 open Elmish.SweetAlert
 
+let private pageSize = 20
+
 type Model =
     { Errors: Result<string, string list> option
       Invoices: Deferred<Invoice list>
-      RemovingInvoice: Invoice option }
+      RemovingInvoice: Invoice option
+      CurrentPage: int
+      Total: int }
 
 type Msg =
     | AddInvoice of Invoice
     | HandleException of Exception
-    | LoadInvoices of AsyncOperationStatus<Result<Invoice list, string>>
+    | LoadInvoices of AsyncOperationStatus<Result<Invoice list * int, string>>
     | RemoveInvoiceConfirm of Invoice
     | RemoveInvoice of Invoice * AsyncOperationStatus<Result<unit, string>>
+    | Paginate of int
+
 type ExtMsg =
     | NoOp
     | InvoiceRemoved of Invoice
 
-let init (): Model * Cmd<Msg> =
+let paginateCmd pageNumber pageSize =
+    Cmd.OfAsync.either
+        (fun _ -> invoiceApi.getInvoices pageNumber pageSize)
+        ()
+        (Finished >> LoadInvoices)
+        (exceptionToResult >> Finished >> LoadInvoices)
+
+let init () : Model * Cmd<Msg> =
 
     let cmd =
         Cmd.batch [ Cmd.ofMsg (LoadInvoices Started) ]
@@ -37,11 +50,13 @@ let init (): Model * Cmd<Msg> =
     let model =
         { Errors = None
           Invoices = HasNotStartedYet
-          RemovingInvoice = None }
+          RemovingInvoice = None
+          CurrentPage = 1
+          Total = 0 }
 
     model, cmd
 
-let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
+let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
     match msg with
     | AddInvoice inv ->
         let invs =
@@ -58,28 +73,31 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
     | LoadInvoices Started ->
         { model with
               Invoices = InProgress None },
-        Cmd.OfAsync.either
-            invoiceApi.getInvoices
-            ()
-            (Finished >> LoadInvoices)
-            (exceptionToResult >> Finished >> LoadInvoices),
+        paginateCmd 1 pageSize,
         NoOp
     | LoadInvoices (Finished result) ->
         { model with
               Invoices =
                   match result with
-                  | Ok i -> Resolved i
-                  | Error _ -> Resolved []
+                  | Ok i -> Resolved(fst i)
+                  | Error _ -> model.Invoices
+              Total =
+                  match result with
+                  | Ok i -> snd i
+                  | Error _ -> model.Total
               Errors =
                   match result with
                   | Ok _ -> None
                   | Error s -> Some(Error [ s ]) },
-        Cmd.none,
+        (match result with
+         | Ok _ -> Cmd.none
+         | Error r -> toastMessage <| Error r),
         NoOp
     | RemoveInvoiceConfirm inv ->
-        let handleConfirm = function
-        | ConfirmAlertResult.Confirmed -> RemoveInvoice (inv,Started)
-        | ConfirmAlertResult.Dismissed reason -> unbox null
+        let handleConfirm =
+            function
+            | ConfirmAlertResult.Confirmed -> RemoveInvoice(inv, Started)
+            | ConfirmAlertResult.Dismissed reason -> unbox null
 
         let confirmAlert =
             ConfirmToastAlert("Are you sure?", handleConfirm)
@@ -88,7 +106,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
                 .Type(AlertType.Warning)
                 .ShowCloseButton(true)
                 .Timeout(10000)
-        model,SweetAlert.Run(confirmAlert),NoOp
+
+        model, SweetAlert.Run(confirmAlert), NoOp
     | RemoveInvoice (inv, Started) ->
         { model with
               RemovingInvoice = Some inv },
@@ -113,6 +132,16 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> * ExtMsg =
               Errors = Some(Error [ r ]) },
         toastMessage <| Error r,
         NoOp
+    | Paginate page ->
+        let page =
+            if (page < 1) then
+                1
+            else if ((page - 1) * pageSize > model.Total) then
+                (page - 1)
+            else
+                page
+
+        { model with CurrentPage = page }, paginateCmd page pageSize, NoOp
 
 type Props = { Model: Model; Dispatch: Msg -> unit }
 
@@ -123,6 +152,7 @@ let view =
     elmishView "InvoiceList"
     <| fun { Model = model; Dispatch = dispatch } ->
         Box.box' [] [
+            h4 [][ str (model.Total.ToString())]
             Table.table [] [
                 thead [] [
                     tr [] [
@@ -192,28 +222,44 @@ let view =
                                                     |> Option.defaultValue false
 
 
-                                                a [
-                                                    Href (sprintf "/api/generateInvoiceDocument/%O" i.Id)
-                                                    Title "Download excel"] [
-                                                    Icon.icon [Icon.Modifiers[Modifier.TextColor IsPrimary]] [
-                                                        Fa.i [ Fa.Regular.FileExcel; ] []
+                                                a [ Href(sprintf "/api/generateInvoiceDocument/%O" i.Id)
+                                                    Title "Download excel" ] [
+                                                    Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsPrimary ] ] [
+                                                        Fa.i [ Fa.Regular.FileExcel ] []
                                                     ]
                                                 ]
 
-                                                a [ OnClick(fun e -> e.preventDefault(); dispatch (RemoveInvoiceConfirm i))
+                                                a [ OnClick
+                                                        (fun e ->
+                                                            e.preventDefault ()
+                                                            dispatch (RemoveInvoiceConfirm i))
                                                     Href "javascript:void(0)"
                                                     Title "Delete invoice" ] [
-                                                    Icon.icon [Icon.Modifiers[Modifier.TextColor IsDanger]] [
+                                                    Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsDanger ] ] [
                                                         match inProgress with
                                                         | false -> Fa.i [ Fa.Solid.TrashAlt ] []
                                                         | true -> Fa.i [ Fa.Pulse; Fa.Solid.Spinner ] []
                                                     ]
                                                 ]
-
-
                                             ]
                                         ]))
                         |> Deferred.defaultResolved []
+                ]
+                tfoot [] [
+                    tr [] [
+                        th [ ColSpan 8 ] [
+                            Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage - 1))
+                                            Button.Props [ Style [ Display(DisplayOptions.Inline) ] ] ] [
+                                str "Previous"
+                            ]
+                            Input.text [ Input.Props [ Size 1.0
+                                                       Style [ Display(DisplayOptions.Inline) ] ]
+                                         Input.Value <| model.CurrentPage.ToString() ]
+                            Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage + 1)) ] [
+                                str "Next"
+                            ]
+                        ]
+                    ]
                 ]
             ]
         ]

@@ -80,7 +80,8 @@ let invoiceApi =
                       invoices.Insert(invoice) |> ignore
 
                       return Ok invoice.Id
-                  with ex -> return Error <| sprintf "%s" ex.Message
+                  with
+                  | ex -> return Error <| sprintf "%s" ex.Message
               }
       getCustomers =
           fun () ->
@@ -106,23 +107,33 @@ let invoiceApi =
                           |> List.traverseResultA Dto.fromCustomerDto
                           |> Result.mapError (fun e -> String.concat ", " e)
 
-                  with e -> return Error e.Message
+                  with
+                  | e -> return Error e.Message
               }
       getInvoices =
-          fun () ->
+          fun pageNumber pageSize ->
               async {
                   try
                       use db = new LiteDatabase(connectionString)
-
+                      let total = db
+                                      .GetCollection<Dto.Invoice>("invoices")
+                                      .Query()
+                                      .Count()
                       return
-                          db
+                          (db
                               .GetCollection<Dto.Invoice>("invoices")
-                              .FindAll()
+                              .Query()
+                              //jeste bych rad pro jistotu sortoval podle, inserted ale multi column sort prej az litedb 5.1
+                              //kazdopadne guid id je sequencni tak snad je to serazeny podle primary indexu tak jak chci
+                              .OrderByDescending(fun x -> x.AccountingPeriod)
+                              .Offset(pageSize * (pageNumber - 1))
+                              .Limit(pageSize)
+                              .ToArray()
                           |> List.ofSeq
-                          |> List.sortByDescending
-                              (fun x -> x.AccountingPeriod.Year, x.AccountingPeriod.Month, x.Inserted)
-                          |> List.traverseResultM Dto.fromInvoiceDto
-                  with e -> return Error e.Message
+                          |> List.traverseResultM Dto.fromInvoiceDto)
+                          |> Result.map (fun x -> x,total)
+                  with
+                  | e -> return Error e.Message
               }
       removeInvoice =
           fun id ->
@@ -141,7 +152,8 @@ let invoiceApi =
                           return
                               Error
                               <| sprintf "Invoice with id %A was not removed." id
-                  with e -> return Error e.Message
+                  with
+                  | e -> return Error e.Message
               }
       searchOrderNumber =
           fun s ->
@@ -160,7 +172,8 @@ let invoiceApi =
                           |> List.distinct
                           |> List.sortByDescending id
                           |> Ok
-                  with e -> return Error e.Message
+                  with
+                  | e -> return Error e.Message
               }
       getTotals =
           fun s ->
@@ -241,10 +254,11 @@ let invoiceApi =
                                   Currency = "CZK"
                                   TimeRange = timeRange } }
                           |> Ok
-                  with e -> return Error e.Message
-              }}
+                  with
+                  | e -> return Error e.Message
+              } }
 
-let generateExcelHandler (id:Guid) =
+let generateExcelHandler (id: Guid) =
     warbler
         (fun (_, ctx) ->
 
@@ -264,7 +278,7 @@ let generateExcelHandler (id:Guid) =
                         && f.AccountingPeriod.Month = invoiceDto.AccountingPeriod.Month)
                     .OrderBy(fun inv -> inv.Inserted)
                     .ToArray()
-                    |> Array.findIndex (fun inv -> inv.Id = id)
+                |> Array.findIndex (fun inv -> inv.Id = id)
 
             let invoice =
                 Dto.fromInvoiceDto invoiceDto
@@ -288,9 +302,42 @@ let webApp =
     |> Remoting.buildHttpHandler
 
 let router =
-    choose [ GET >=> routef "/api/generateInvoiceDocument/%O" generateExcelHandler
+    choose [ GET
+             >=> routef "/api/generateInvoiceDocument/%O" generateExcelHandler
              routeStartsWith "/api" >=> webApp
              setStatusCode 404 >=> text "Not found" ]
+
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Server.Kestrel.Https
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.AspNetCore.Authentication.Certificate
+
+type Saturn.Application.ApplicationBuilder with
+    [<CustomOperation("use_client_certificate")>]
+    member __.UseClientCertificate(state: ApplicationState) =
+        let middleware (app: IApplicationBuilder) = app.UseAuthentication()
+
+        let service (s: IServiceCollection) =
+            s.AddAuthentication(CertificateAuthenticationDefaults.AuthenticationScheme)
+                .AddCertificate()       // The default implementation uses a memory cache.
+                .AddCertificateCache()
+                |> ignore
+            s
+
+        let webHostBuilder (webHost: IWebHostBuilder) =
+            webHost.ConfigureKestrel(fun o ->
+                o.ConfigureHttpsDefaults(fun u ->
+                    //u.ServerCertificate
+                    let lol() = 1 + 1
+                    lol() |> ignore
+                    u.ClientCertificateMode <- ClientCertificateMode.RequireCertificate))
+
+        { state with
+              ServicesConfig = service :: state.ServicesConfig
+              AppConfigs = middleware :: state.AppConfigs
+              WebHostConfigs = webHostBuilder :: state.WebHostConfigs
+              CookiesAlreadyAdded = true }
 
 let app =
     application {
@@ -299,7 +346,7 @@ let app =
         memory_cache
         use_static "public"
         use_gzip
-
+        //use_client_certificate
     }
 
 

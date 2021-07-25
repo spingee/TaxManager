@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": ".NET Core Launch (console)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/Server/bin/Debug/net5.0/Server.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Server",
+            "stopAtEntry": false,
+            "console": "internalConsole"
+        },
+        {
             "name": "Docker .NET Core Attach (Preview)",
             "type": "docker",
             "request": "attach",

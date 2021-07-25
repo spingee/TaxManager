@@ -10,6 +10,7 @@ nuget Fable.Remoting.Giraffe
 nuget FsToolkit.ErrorHandling
 nuget GemBox.Spreadsheet
 nuget LiteDB
+nuget Microsoft.AspNetCore.Authentication.Certificate
 nuget MinVer
 nuget NewId
 nuget Saturn
