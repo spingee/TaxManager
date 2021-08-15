@@ -152,8 +152,8 @@ let view =
     elmishView "InvoiceList"
     <| fun { Model = model; Dispatch = dispatch } ->
         Box.box' [] [
-            h4 [][ str (model.Total.ToString())]
-            Table.table [] [
+            //h4 [][ str (model.Total.ToString())]
+            Table.table [ Table.IsFullWidth ] [
                 thead [] [
                     tr [] [
                         th [] [ str "Period" ]
@@ -248,14 +248,21 @@ let view =
                 tfoot [] [
                     tr [] [
                         th [ ColSpan 8 ] [
+                            let isLast =
+                                model.CurrentPage * pageSize >= model.Total
+
                             Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage - 1))
+                                            Button.Disabled (model.CurrentPage <= 1)
                                             Button.Props [ Style [ Display(DisplayOptions.Inline) ] ] ] [
                                 str "Previous"
                             ]
+
                             Input.text [ Input.Props [ Size 1.0
                                                        Style [ Display(DisplayOptions.Inline) ] ]
                                          Input.Value <| model.CurrentPage.ToString() ]
-                            Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage + 1)) ] [
+
+                            Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage + 1))
+                                            Button.Disabled(isLast) ] [
                                 str "Next"
                             ]
                         ]

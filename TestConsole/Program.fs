@@ -19,7 +19,11 @@ let import() =
 
     Directory.CreateDirectory("./db") |> ignore;
     use db = new LiteDatabase(connectionString)
-
+    let invoice = db
+                   .GetCollection<Dto.Invoice>("invoices")
+                   .Query()
+                   .OrderByDescending(fun x -> x.AccountingPeriod)
+                   .FirstOrDefault()
     let invoices =
       db.GetCollection<Dto.Invoice>("invoices")
 
@@ -31,9 +35,15 @@ let import() =
 
 [<EntryPoint>]
 let main argv =
+    Directory.CreateDirectory("./db") |> ignore;
+    use db = new LiteDatabase(connectionString)
+    let invoice = db
+                   .GetCollection<Dto.Invoice>("invoices")
+                   .Query()
+                   .OrderByDescending(fun x -> x.AccountingPeriod)
+                   .FirstOrDefault()
+                   |> (fun x -> if ((box x) = null) then None else Some x)
 
-      let a = fff
-      a.Add("")
-      //a.Add(1)
-      Console.ReadLine() |> ignore
-      0
+    //a.Add(1)
+    Console.ReadLine() |> ignore
+    0

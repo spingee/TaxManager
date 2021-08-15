@@ -106,14 +106,14 @@ let view (model: Model) (dispatch: Msg -> unit) =
             ]
         ]
 
-        Hero.body [] [
+        Hero.body [ Props [ Style [ AlignItems AlignItemsOptions.FlexStart ] ] ] [
 
             Container.container [] [
                 Totals.Panel(
                     model.Totals
                     |> Deferred.defaultResolved Invoice.TotalsDefault
                 )
-                Columns.columns [ Columns.IsCentered ] [
+                Columns.columns [] [
                     Column.column [ Column.Width(Screen.All, Column.IsOneThird) ] [
                         Heading.p [ Heading.Modifiers [ Modifier.TextAlignment(Screen.All, TextAlignment.Centered) ] ] [
                             str <| model.Title
@@ -122,10 +122,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             { Model = model.InvoiceModel
                               Dispatch = dispatch << InvoiceMsg }
                     ]
-                    Column.column [ Column.Width(Screen.All, Column.IsNarrow) ] [
+                    Column.column [ Column.Width(Screen.All, Column.IsFourFifths) ] [
                         Invoices.view
                             { Model = model.InvoicesModel
-                              Dispatch = (dispatch << InvoicesMsg) }
+                              Dispatch = dispatch << InvoicesMsg }
                     ]
                 ]
             ]

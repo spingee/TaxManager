@@ -33,7 +33,7 @@
         "webpack-dev-server": "^3.8.2"
     },
     "dependencies": {
-        "bulma": "^0.9.1",
+        "bulma": "^0.9.3",
         "sweetalert2": "^8.19.0",
         "toastr": "^2.1.4"
     }

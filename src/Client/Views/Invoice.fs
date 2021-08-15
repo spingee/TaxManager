@@ -64,6 +64,7 @@ type Msg =
     | CustomerMsg of Customer.Msg
     | VatApplicable of bool
     | SearchBoxMsg of SearchBox.Msg
+    | LoadDefaults of AsyncOperationStatus<Result<Invoice.Invoice option, string>>
 
 type ExtMsg =
     | NoOp
@@ -97,6 +98,7 @@ let init () =
 
     Cmd.batch [ Cmd.map CustomerMsg cmd
                 Cmd.ofMsg (LoadCustomers Started)
+                Cmd.ofMsg (LoadDefaults Started)
                 Cmd.map SearchBoxMsg searchBoxCmd ]
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
@@ -291,9 +293,38 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
         Cmd.batch [ Cmd.map SearchBoxMsg subCmd
                     cmd ],
         NoOp
+    | LoadDefaults Started ->
+        { model with
+              Customers = InProgress None },
+        Cmd.OfAsync.either
+            invoiceApi.getInvoiceDefaults
+            ()
+            (Finished >> LoadDefaults)
+            (exceptionToResult >> Finished >> LoadDefaults),
+        NoOp
 
+    | LoadDefaults (Finished result) ->
+        let model =
+            match result with
+            | Ok (Some i) ->
+                { model with
+                      Rate = Validated.success (i.Rate.ToString()) i.Rate
+                      SelectedCustomer = Some i.Customer
+                      ManDays = Validated.success (i.ManDays.ToString()) i.ManDays
+                      AccountingPeriod = i.AccountingPeriod
+                      OrderNumber =
+                          Validated.success
+                              (i.OrderNumber
+                               |> function
+                                   | Some o -> o
+                                   | _ -> "")
+                              i.OrderNumber }
+            | Error e ->
+                { model with
+                      Result = Some(Error [ e ]) }
+            | _ -> model
 
-
+        model, Cmd.none, NoOp
 
 
 type Props = { Model: Model; Dispatch: Msg -> unit }

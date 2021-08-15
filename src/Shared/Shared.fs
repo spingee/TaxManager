@@ -64,6 +64,7 @@ module Invoice =
         { addInvoice: Invoice -> Async<Result<Guid, string>>
           getCustomers: unit -> Async<Result<Customer list, string>>
           getInvoices: int -> int -> Async<Result<Invoice list * int, string>>
+          getInvoiceDefaults: unit -> Async<Result<Invoice option, string>>
           removeInvoice: Guid -> Async<Result<unit, string>>
           searchOrderNumber: string -> Async<Result<string list, string>>
           getTotals: unit -> Async<Result<Totals, string>> }

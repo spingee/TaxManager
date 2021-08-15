@@ -14,13 +14,14 @@ open System.IO
 open MassTransit
 open System.Globalization
 open Giraffe
-open FSharp.Control.Tasks.ContextInsensitive
+open Auth
 //open System.Linq
 
 let connectionString =
     @"FileName=./db/taxmanager.db;Connection=shared"
 #if DEBUG
-let documentOutputDir = @"C:\Users\SpinGee\Desktop"
+let documentOutputDir =
+    Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
 #else
 let documentOutputDir = "./output"
 #endif
@@ -115,23 +116,52 @@ let invoiceApi =
               async {
                   try
                       use db = new LiteDatabase(connectionString)
-                      let total = db
-                                      .GetCollection<Dto.Invoice>("invoices")
-                                      .Query()
-                                      .Count()
+
+                      let total =
+                          db
+                              .GetCollection<Dto.Invoice>("invoices")
+                              .Query()
+                              .Count()
+
                       return
                           (db
                               .GetCollection<Dto.Invoice>("invoices")
-                              .Query()
-                              //jeste bych rad pro jistotu sortoval podle, inserted ale multi column sort prej az litedb 5.1
-                              //kazdopadne guid id je sequencni tak snad je to serazeny podle primary indexu tak jak chci
-                              .OrderByDescending(fun x -> x.AccountingPeriod)
-                              .Offset(pageSize * (pageNumber - 1))
-                              .Limit(pageSize)
-                              .ToArray()
-                          |> List.ofSeq
-                          |> List.traverseResultM Dto.fromInvoiceDto)
-                          |> Result.map (fun x -> x,total)
+                               .Query()
+                               //jeste bych rad pro jistotu sortoval podle, inserted ale multi column sort prej az litedb 5.1
+                               //kazdopadne guid id je sequencni tak snad je to serazeny podle primary indexu tak jak chci
+                               .OrderByDescending(fun x -> x.AccountingPeriod)
+                               .Offset(pageSize * (pageNumber - 1))
+                               .Limit(pageSize)
+                               .ToArray()
+                           |> List.ofSeq
+                           |> List.traverseResultM Dto.fromInvoiceDto)
+                           |> Result.map (fun x -> x, total)
+                  with
+                  | e -> return Error e.Message
+              }
+      getInvoiceDefaults =
+          fun () ->
+              async {
+                  try
+                      let lastMonth= DateTime.Now.AddMonths(-1)
+                      let mandays =
+                        [1..DateTime.DaysInMonth (lastMonth.Year,lastMonth.Month) ]
+                        |> List.filter (fun d -> not ([DayOfWeek.Saturday ; DayOfWeek.Sunday] |> List.contains (DateTime(lastMonth.Year,lastMonth.Month,d).DayOfWeek) ))
+                        |> List.length
+                        |> uint8
+
+                      use db = new LiteDatabase(connectionString)
+                      return
+                          (db
+                              .GetCollection<Dto.Invoice>("invoices")
+                               .Query()
+                               .OrderByDescending(fun x -> x.AccountingPeriod)
+                               .FirstOrDefault()//
+                               |> (fun x -> if ((box x) = null) then None else Some x)
+                               |> Option.map (fun x-> {x with ManDays = mandays ; AccountingPeriod = lastMonth})
+                               |> Option.traverseResult Dto.fromInvoiceDto
+                           )
+
                   with
                   | e -> return Error e.Message
               }
@@ -287,8 +317,8 @@ let generateExcelHandler (id: Guid) =
             let fileName =
                 getInvoiceFileName invoiceDto.AccountingPeriod.Year invoiceDto.AccountingPeriod.Month (index + 1)
 
-            ctx.SetHttpHeader "Content-Disposition" $"inline; filename=\"{fileName}.xlsx\""
-            ctx.SetHttpHeader "Content-Type" "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ctx.SetHttpHeader("Content-Disposition", $"inline; filename=\"{fileName}.xlsx\"")
+            ctx.SetHttpHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             let stream =
                 new MemoryStream(generateExcelData invoice (index + 1))
@@ -307,37 +337,7 @@ let router =
              routeStartsWith "/api" >=> webApp
              setStatusCode 404 >=> text "Not found" ]
 
-open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Server.Kestrel.Https
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.AspNetCore.Authentication.Certificate
 
-type Saturn.Application.ApplicationBuilder with
-    [<CustomOperation("use_client_certificate")>]
-    member __.UseClientCertificate(state: ApplicationState) =
-        let middleware (app: IApplicationBuilder) = app.UseAuthentication()
-
-        let service (s: IServiceCollection) =
-            s.AddAuthentication(CertificateAuthenticationDefaults.AuthenticationScheme)
-                .AddCertificate()       // The default implementation uses a memory cache.
-                .AddCertificateCache()
-                |> ignore
-            s
-
-        let webHostBuilder (webHost: IWebHostBuilder) =
-            webHost.ConfigureKestrel(fun o ->
-                o.ConfigureHttpsDefaults(fun u ->
-                    //u.ServerCertificate
-                    let lol() = 1 + 1
-                    lol() |> ignore
-                    u.ClientCertificateMode <- ClientCertificateMode.RequireCertificate))
-
-        { state with
-              ServicesConfig = service :: state.ServicesConfig
-              AppConfigs = middleware :: state.AppConfigs
-              WebHostConfigs = webHostBuilder :: state.WebHostConfigs
-              CookiesAlreadyAdded = true }
 
 let app =
     application {
@@ -346,7 +346,7 @@ let app =
         memory_cache
         use_static "public"
         use_gzip
-        //use_client_certificate
+    //use_client_certificate
     }
 
 

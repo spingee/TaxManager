@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -11,6 +11,7 @@
     <Folder Include="db\" />
     <Compile Include="Dto.fs" />
     <Compile Include="InvoiceExcel.fs" />
+    <Compile Include="Auth.fs" />
     <Compile Include="Server.fs" />
     <Content Include="InvoiceTemplate.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
