@@ -251,19 +251,74 @@ let view =
                             let isLast =
                                 model.CurrentPage * pageSize >= model.Total
 
-                            Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage - 1))
-                                            Button.Disabled (model.CurrentPage <= 1)
-                                            Button.Props [ Style [ Display(DisplayOptions.Inline) ] ] ] [
-                                str "Previous"
-                            ]
+                            let max =
+                                System.Math.Ceiling((decimal model.Total) / (decimal pageSize))
+                                |> int
 
-                            Input.text [ Input.Props [ Size 1.0
-                                                       Style [ Display(DisplayOptions.Inline) ] ]
-                                         Input.Value <| model.CurrentPage.ToString() ]
 
-                            Button.button [ Button.OnClick(fun e -> dispatch <| Paginate(model.CurrentPage + 1))
-                                            Button.Disabled(isLast) ] [
-                                str "Next"
+                            Pagination.pagination [] [
+                                Pagination.Previous.a [ Props [ Disabled(model.CurrentPage <= 1)
+                                                                OnClick
+                                                                    (fun e -> dispatch <| Paginate(model.CurrentPage - 1)) ] ] [
+                                    str "Previous"
+                                ]
+
+                                Pagination.Next.a [ Props [ Disabled isLast
+                                                            OnClick(fun e -> dispatch <| Paginate(model.CurrentPage + 1)) ] ] [
+                                    str "Next"
+                                ]
+                                if (max >= 5) then
+                                    let middle = max / 2
+                                    let middleLower = middle - 1
+                                    let middleHigher = middle + 1
+
+                                    Pagination.list [] [
+                                        Pagination.Link.a [ Pagination.Link.Props [ OnClick
+                                                                                      (fun e -> dispatch <| Paginate(1)) ]
+                                                            Pagination.Link.Current(1 = model.CurrentPage) ] [
+                                            str (1l.ToString())
+                                        ]
+                                        Pagination.ellipsis []
+                                        Pagination.Link.a [ Pagination.Link.Props [ OnClick
+                                                                                      (fun e ->
+                                                                                          dispatch
+                                                                                          <| Paginate(middleLower)) ]
+                                                            Pagination.Link.Current(middleLower = model.CurrentPage) ] [
+                                            str (middleLower.ToString())
+                                        ]
+                                        Pagination.Link.a [ Pagination.Link.Props [ OnClick
+                                                                                      (fun e ->
+                                                                                          dispatch <| Paginate(middle)) ]
+                                                            Pagination.Link.Current(middle = model.CurrentPage) ] [
+                                            str (middle.ToString())
+                                        ]
+                                        Pagination.Link.a [ Pagination.Link.Props [ OnClick
+                                                                                      (fun e ->
+                                                                                          dispatch
+                                                                                          <| Paginate(middleHigher)) ]
+                                                            Pagination.Link.Current(middleHigher = model.CurrentPage) ] [
+                                            str (middleHigher.ToString())
+                                        ]
+                                        Pagination.ellipsis []
+                                        Pagination.Link.a [ Pagination.Link.Props [ OnClick
+                                                                                      (fun e ->
+                                                                                          dispatch <| Paginate(max)) ]
+                                                            Pagination.Link.Current(max = model.CurrentPage) ] [
+                                            str (max.ToString())
+                                        ]
+                                    ]
+                                else
+                                    Pagination.list [] [
+                                        for x in 1 .. max do
+                                            yield
+                                                Pagination.Link.a [ Pagination.Link.Props [ OnClick
+                                                                                              (fun e ->
+                                                                                                  dispatch
+                                                                                                  <| Paginate(x)) ]
+                                                                    Pagination.Link.Current(x = model.CurrentPage) ] [
+                                                    str (x.ToString())
+                                                ]
+                                    ]
                             ]
                         ]
                     ]
