@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Pisemnost nazevSW="EPO MF ČR" verzeSW="41.21.1">
+    <DPFDP5 verzePis="06.03">
+        <VetaD uv_rozsah="P" da_slevy35ba="67140" rok="2020" pln_moc="N" dokument="DP5" audit="N" c_ufo_cil="457"
+               k_uladis="DPF" zdobd_od="01.01.2020" kc_zbyvpred="41140" da_celod13="91980" uhrn_slevy35ba="24840"
+               kc_op15_1a="24840" prop_zahr="N" kc_zalpred="26000" zdobd_do="31.12.2020" kc_dztrata="0"
+               da_slevy35c="67140" da_slezap="91980.00" dap_typ="B"/>
+        <VetaP ulice="Sportovní" psc="46841" email="spingee@gmail.com" k_stat="CZ" rod_c="8304072524" titul="Bc."
+               rodnepr="Strnad" c_pop="555" c_obce="563820" c_orient="28" c_telef="724792362" c_pracufo="2608"
+               prijmeni="Strnad" stat="ČESKÁ REPUBLIKA" dic="8304072524" st_prislus="Česká" naz_obce="TANVALD"
+               jmeno="Jan"/>
+        <VetaO kc_vynprij="619200" kc_uhrn="619200" kc_zakldan="619200" kc_zd7="619200" kc_zakldan23="619200"/>
+        <VetaS kc_zdzaokr="613200" kc_odcelk="6000" kc_op15_12="6000" kc_zdsniz="613200" da_dan16="91980"/>
+        <VetaB priloh_celk="2" potv_penpri="1" priloha1="1"/>
+        <VetaT c_nace="620100" pr_prij7="1548000" kc_prij7="1548000" celk_pr_prij7="1548000" kc_zd7p="619200"
+               celk_pr_vyd7="928800" m_podnik="12" vyd7proc="A" kc_hosp_rozd="619200" pr_vyd7="928800" pr_sazba="60"
+               kc_vyd7="928800" kc_zd7vyn="619200"/>
+        <VetaV spol_jm_manz="N" vyd9proc="N"/>
+        <Prilohy>
+            <PredepsanaPriloha cislo="2"
+                               nazev="Potvrzení o zaplacených příspěvcích na penzijní připojištění, penzijní pojištění, nebo doplňkové penzijní spoření"
+                               jm_souboru="penzijko.jpg" kod="PP_POTPENZ" kodovani="base64">
+
+            </PredepsanaPriloha>
+        </Prilohy>
+    </DPFDP5>
+</Pisemnost>

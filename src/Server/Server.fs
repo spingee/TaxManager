@@ -1,7 +1,13 @@
 module Server
 
+open System.Net
+open System.Net.Http
+open System.Text
+open System.Threading
+open System.Xml.Linq
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
+open Microsoft.AspNetCore.Http
 open Saturn
 open System
 open Shared
@@ -15,6 +21,9 @@ open MassTransit
 open System.Globalization
 open Giraffe
 open Auth
+open FSharp.Control.Tasks
+open SummaryReportGenerator
+open Service
 //open System.Linq
 
 let connectionString =
@@ -30,8 +39,7 @@ do CultureInfo.DefaultThreadCurrentCulture <- cultureInfo
 do CultureInfo.DefaultThreadCurrentUICulture <- cultureInfo
 do SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
 
-let getInvoiceFileName year month index =
-    sprintf "Faktura - %i-%02i-%02i" year month index
+
 
 let invoiceApi =
     { addInvoice =
@@ -214,20 +222,8 @@ let invoiceApi =
                       let s = DateTime(y.Year, 1, 1)
                       let e = s.AddYears(1)
 
-                      let lastYear =
-                          db
-                              .GetCollection<Dto.Invoice>("invoices")
-                              .Query()
-                              .Where(fun i -> i.AccountingPeriod >= s && i.AccountingPeriod < e)
-                              .ToArray()
-                          |> Array.sumBy
-                              (fun a ->
-                                  let total = a.Rate * uint32 a.ManDays
+                      let lastYear = getTotal connectionString y.Year
 
-                                  //   match Option.ofNullable a.Vat with
-                                  //   | None -> total
-                                  //   | Some v -> total + (total / uint32 100 * uint32 v)
-                                  total)
 
                       let quarterStart, quarterEnd, timeRange =
                           match DateTime.Now.Month with
@@ -286,54 +282,83 @@ let invoiceApi =
                           |> Ok
                   with
                   | e -> return Error e.Message
-              } }
+              }
+      prepareAnnualTaxReportUrl =
+          fun () ->
+              async {
+                  try
+                      let stream =
+                          generateAnnualTaxReport {
+                                Year = DateTime.Now.AddYears(-1).Year |> uint16
+                                ExpensesType = Virtual 60uy
+                                DateOfFill = DateTime.Now
+                                TotalEarnings = 1600000u
+                                PenzijkoAttachment = None
+                          }
 
-let generateExcelHandler (id: Guid) =
-    warbler
-        (fun (_, ctx) ->
+                      match stream with
+                      | Error errs -> return Error (errs |> String.concat Environment.NewLine)
+                      | Ok stream ->
 
-            use db = new LiteDatabase(connectionString)
+                          use stream = stream
+                          do stream.Position <- 0L
 
-            let invoices =
-                db.GetCollection<Dto.Invoice>("invoices")
+                          use content = new StreamContent(stream)
+                          content.Headers.Add("Content-Type","application/xml")
+                          let httpClientHandler = new HttpClientHandler()
+                          use httpClient = new HttpClient(httpClientHandler)
 
 
-            let invoiceDto = invoices.FindById(BsonValue(id))
+                          let url = "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
+                          use requestMessage =
+                                new HttpRequestMessage(
+                                    HttpMethod.Post,
+                                    url
+                                )
 
-            let index =
-                invoices
-                    .Query()
-                    .Where(fun f ->
-                        f.AccountingPeriod.Year = invoiceDto.AccountingPeriod.Year
-                        && f.AccountingPeriod.Month = invoiceDto.AccountingPeriod.Month)
-                    .OrderBy(fun inv -> inv.Inserted)
-                    .ToArray()
-                |> Array.findIndex (fun inv -> inv.Id = id)
 
-            let invoice =
-                Dto.fromInvoiceDto invoiceDto
-                |> Result.valueOr failwith
+                          requestMessage.Content <- content
 
-            let fileName =
-                getInvoiceFileName invoiceDto.AccountingPeriod.Year invoiceDto.AccountingPeriod.Month (index + 1)
 
-            ctx.SetHttpHeader("Content-Disposition", $"inline; filename=\"{fileName}.xlsx\"")
-            ctx.SetHttpHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-            let stream =
-                new MemoryStream(generateExcelData invoice (index + 1))
+                          use! response = httpClient.PostAsync(url,content) |> Async.AwaitTask
+                          let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                          if (not response.IsSuccessStatusCode) then
+                             return Error $"Remote api error {body}"
+                          else
+                            let url =
+                                (XDocument.Parse body).Root.Value
+                            return Ok url
+                  with
+                  | e -> return Error (e.Message + e.StackTrace)
+              }
+          }
 
-            streamData false stream None None)
+let downloadHandler file : HttpHandler =
+        fun (next : HttpFunc) (ctx : HttpContext) ->
+            task {
+                ctx.SetHttpHeader("Content-Disposition", $"inline; filename=\"{file.FileName}\"")
+                ctx.SetHttpHeader("Content-Type", file.ContentType)
+                use stream = file.Stream
+                return! streamData false stream None None next ctx
+            }
+
+
+
+let summaryReportHandler =  SummaryReportType.fromString
+                            >> generateSummaryReportFile connectionString
+                            >> Result.map downloadHandler
+                            >> Result.valueOr (fun e -> setStatusCode 500 >=> text (String.concat "\n" e))
+
 
 let webApp =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue invoiceApi
     |> Remoting.buildHttpHandler
-
 let router =
-    choose [ GET
-             >=> routef "/api/generateInvoiceDocument/%O" generateExcelHandler
+    choose [ GET  >=> routef "/api/generateInvoiceDocument/%O" (generateInvoiceExcel connectionString >> downloadHandler)
+             GET  >=> routef "/api/generateSummaryReport/%s" summaryReportHandler
              routeStartsWith "/api" >=> webApp
              setStatusCode 404 >=> text "Not found" ]
 

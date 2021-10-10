@@ -7,6 +7,7 @@ nuget Elmish.Toastr
 nuget Fable.React.Flatpickr
 nuget Fable.Reaction
 nuget Fable.Remoting.Giraffe
+nuget FSharp.Data
 nuget FsToolkit.ErrorHandling
 nuget GemBox.Spreadsheet
 nuget LiteDB

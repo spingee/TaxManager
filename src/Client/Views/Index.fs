@@ -7,6 +7,8 @@ open Shared
 open Elmish
 open Utils
 open Api
+open Common
+open FsToolkit.ErrorHandling
 
 
 type Model =
@@ -20,6 +22,7 @@ type Msg =
     | InvoiceMsg of Invoice.Msg
     | InvoicesMsg of Invoices.Msg
     | LoadTotals of AsyncOperationStatus<Result<Invoice.Totals, string>>
+    | ReportRequest of AsyncOperationStatus<Result<string, string>>
 
 
 
@@ -85,6 +88,22 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                       ) },
         Cmd.none
 
+    | ReportRequest Started ->
+        { model with
+              Totals = InProgress(Deferred.toOption model.Totals) },
+        Cmd.OfAsync.either
+            invoiceApi.prepareAnnualTaxReportUrl
+            ()
+            (Finished >> ReportRequest)
+            (exceptionToResult >> Finished >> LoadTotals)
+    | ReportRequest (Finished result) ->
+        result
+            |> Result.tee (fun url ->  (Browser.Dom.window.``open`` (url,"_blank")).focus())
+            |> ignore
+        //{model with Title = Result.defaultValue "" result}
+        model
+        , toastMessage result
+
 
 
 let navBrand =
@@ -110,8 +129,10 @@ let view (model: Model) (dispatch: Msg -> unit) =
 
             Container.container [] [
                 Totals.Panel(
-                    model.Totals
-                    |> Deferred.defaultResolved Invoice.TotalsDefault
+                        {
+                           Totals = model.Totals |> Deferred.defaultResolved Invoice.TotalsDefault
+                           ReportRequest = fun r -> dispatch <| Msg.ReportRequest Started
+                        }
                 )
                 Columns.columns [] [
                     Column.column [ Column.Width(Screen.All, Column.IsOneThird) ] [

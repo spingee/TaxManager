@@ -8,13 +8,21 @@
     <ProjectReference Include="..\Shared\Shared.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="db\" />
+    <Content Include="Xsd\dpfdp5_epo2_sample.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Folder Include="db\" />   
     <Compile Include="Dto.fs" />
+    <Compile Include="SummaryReportGenerator.fs" />
     <Compile Include="InvoiceExcel.fs" />
     <Compile Include="Auth.fs" />
+    <Compile Include="Service.fs" />
     <Compile Include="Server.fs" />
     <Content Include="InvoiceTemplate.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Xsd\dpfdp5_epo2.xsd">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <None Include="paket.references" />
   </ItemGroup>

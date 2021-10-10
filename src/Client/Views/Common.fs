@@ -86,7 +86,7 @@ let toastMessage =
     | Error e ->
         Toastr.message e
         |> Toastr.position TopRight
-        |> Toastr.timeout 0
+        |> Toastr.timeout 20000
         |> Toastr.extendedTimout 0
         |> Toastr.showCloseButton
         |> Toastr.error

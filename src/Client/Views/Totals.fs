@@ -6,69 +6,64 @@ open Fable.React
 open Fable.React.Props
 open Fulma
 open Utils
+open Fable.FontAwesome
+
+type Report =
+    | Annual
+
+type Props =
+    { Totals: Totals ; ReportRequest: Report -> unit }
 
 let Panel =
     FunctionComponent.Of
-        (fun (props: Totals) ->
+        (fun (props: Props) ->
             Level.level [] [
                 Level.item [ Level.Item.HasTextCentered ] [
                     div [] [
                         Level.heading [ Modifiers [ Modifier.TextColor IsPrimary ] ] [
-                            str <| sprintf "Last quarter (%s)" props.LastQuarter.TimeRange
+                            str
+                            <| sprintf "Last quarter (%s)" props.Totals.LastQuarter.TimeRange
                         ]
 
                         Level.title [] [
-                            str <| formatDecimal 2 props.LastQuarter.Value
+                            str <| formatDecimal 2 props.Totals.LastQuarter.Value
                         ]
                     ]
                 ]
                 Level.item [ Level.Item.HasTextCentered ] [
                     div [] [
                         Level.heading [ Modifiers [ Modifier.TextColor IsPrimary ] ] [
-                            str <| sprintf "Last quarter VAT (%s)" props.LastQuarterVat.TimeRange
+                            str
+                            <| sprintf "Last quarter VAT (%s)" props.Totals.LastQuarterVat.TimeRange
                         ]
 
                         Level.title [] [
-                            str <|  formatDecimal 2 props.LastQuarterVat.Value
+                            str <| formatDecimal 2 props.Totals.LastQuarterVat.Value
                         ]
                     ]
                 ]
                 Level.item [ Level.Item.HasTextCentered ] [
                     div [] [
                         Level.heading [ Modifiers [ Modifier.TextColor IsPrimary ] ] [
-                            str <| sprintf "Last year (%s)" props.LastYear.TimeRange
+                            str
+                            <| sprintf "Last year (%s)" props.Totals.LastYear.TimeRange
                         ]
 
                         Level.title [] [
-                            str <| formatDecimal 2 props.LastYear.Value
+                            str <| formatDecimal 2 props.Totals.LastYear.Value
+                            a [ Href "#"
+                                Title "Send to and open financial office form"
+                                OnClick (fun e ->
+                                            e.preventDefault()
+                                            props.ReportRequest Annual
+                                          )
+                                ] [
+                                Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsInfo ] ] [
+                                    Fa.i [ Fa.Solid.Building
+                                           Fa.Size Fa.FaExtraSmall ] []
+                                ]
+                            ]
                         ]
                     ]
                 ]
             ])
-// Field.div [ Field.IsGrouped
-//             Field.IsGroupedMultiline ] [
-//     Control.div [] [
-//         Tag.list [ Tag.List.HasAddons ] [
-//             Tag.tag [Tag.Color IsDark] [ str <| "Last quarter" ]
-//             Tag.tag [ Tag.Color IsPrimary ] [
-//                 str <| props.LastQuarterTotal.ToString()
-//             ]
-//         ]
-//     ]
-//     Control.div [] [
-//         Tag.list [ Tag.List.HasAddons ] [
-//             Tag.tag [Tag.Color IsDark] [ str <| "Last quarter VAT" ]
-//             Tag.tag [ Tag.Color IsPrimary ] [
-//                 str <| props.LastQuarterTotalVat.ToString()
-//             ]
-//         ]
-//     ]
-//     Control.div [] [
-//         Tag.list [ Tag.List.HasAddons ] [
-//             Tag.tag [Tag.Color IsDark] [ str <| "Last year" ]
-//             Tag.tag [ Tag.Color IsPrimary ] [
-//                 str <| props.LastYearTotal.ToString()
-//             ]
-//         ]
-//     ]
-// ])

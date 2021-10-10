@@ -158,9 +158,9 @@ let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice indexNum
 
 let generateExcelData invoice indexNumber =
     let workbook = generateWorkBook invoice indexNumber
-    use stream = new MemoryStream()
+    let stream = new MemoryStream()
     workbook.Save(stream,SaveOptions.XlsxDefault)
-    stream.ToArray()
+    stream
 
 let readFromExcel file =
     let workbook = ExcelFile.Load(path = file)

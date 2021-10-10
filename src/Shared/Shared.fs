@@ -60,6 +60,16 @@ module Invoice =
                 Currency = "CZK"
                 TimeRange = "" } }
 
+    type SummaryReportType =
+        | AnnualTax
+        | QuartalVat
+        | QuartalVatAnnounce
+        static member fromString string =
+            match string with
+            | nameof(AnnualTax) -> AnnualTax
+            | nameof(QuartalVat) -> QuartalVat
+            | nameof(QuartalVatAnnounce) -> QuartalVatAnnounce
+            | _ -> failwithf "Not implemented: %s" string
     type IInvoiceApi =
         { addInvoice: Invoice -> Async<Result<Guid, string>>
           getCustomers: unit -> Async<Result<Customer list, string>>
@@ -67,7 +77,8 @@ module Invoice =
           getInvoiceDefaults: unit -> Async<Result<Invoice option, string>>
           removeInvoice: Guid -> Async<Result<unit, string>>
           searchOrderNumber: string -> Async<Result<string list, string>>
-          getTotals: unit -> Async<Result<Totals, string>> }
+          getTotals: unit -> Async<Result<Totals, string>>
+          prepareAnnualTaxReportUrl: unit -> Async<Result<string, string>> }
 
     let getInvoiceNumber invoice indexNumber =
         sprintf "%i%02i%02i" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month indexNumber
