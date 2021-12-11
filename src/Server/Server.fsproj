@@ -8,6 +8,9 @@
         <ProjectReference Include="..\Shared\Shared.fsproj" />
     </ItemGroup>
     <ItemGroup>
+        <Content Include="Xsd\dpfdp5_epo2.xsd">
+          <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        </Content>
         <Content Include="Xsd\dpfdp5_epo2_sample.xml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
@@ -20,9 +23,6 @@
         <Compile Include="Server.fs" />
         <Content Include="InvoiceTemplate.xlsx">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
-        <Content Include="Xsd\dpfdp5_epo2.xsd">
-            <CopyToOutputDirectory>Never</CopyToOutputDirectory>
         </Content>
         <None Include="paket.references" />
         <Content Include="db\dummy.txt">
