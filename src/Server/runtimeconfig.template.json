@@ -1,0 +1,10 @@
+{
+    "properties": {
+        "runtimeOptions": {
+        }
+    },
+    "configProperties": {
+        "_comment": "Added in order to Gembox.SpreadSheet to work on linux even in .net6+ ,https://docs.microsoft.com/en-us/dotnet/core/compatibility/core-libraries/6.0/system-drawing-common-windows-only#recommended-action",
+        "System.Drawing.EnableUnixSupport": true
+    }
+}

@@ -55,8 +55,11 @@ let ensureAttrAndSetMultiple (xElem: XElement) names value =
     }
 
 let generateAnnualTaxReport input =
+
+    let stream = File.OpenRead("./Xsd/dpfdp5_epo2_sample.xml")
+
     let xml =
-        AnnualTaxReport.Load("Xsd/dpfdp5_epo2_sample.xml")
+        AnnualTaxReport.Load(stream)
 
     let yearStart =
         DateTime(input.Year |> int, 1, 1)

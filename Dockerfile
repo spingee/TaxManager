@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/aspnet:5.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS runtime
 
 #install font for document converter
 #RUN apt-get update; apt-get install -y fontconfig fonts-liberation

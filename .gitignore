@@ -8,6 +8,7 @@ deploy/
 obj/
 bin/
 packages/
+output/
 paket-files/
 node_modules/
 release.cmd
