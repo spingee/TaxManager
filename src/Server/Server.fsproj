@@ -14,6 +14,10 @@
         <Content Include="Xsd\dpfdp5_epo2_sample.xml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Include="Xsd\dphkh1_epo2.xsd" />
+        <Content Include="Xsd\dphkh1_epo2_sample.xml">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
 
         <Compile Include="Dto.fs" />
         <Compile Include="SummaryReportGenerator.fs" />

@@ -5,6 +5,7 @@ open Fable.React.Props
 open Fulma
 open Shared
 open Elmish
+open Shared.Invoice
 open Utils
 open Api
 open Common
@@ -22,7 +23,7 @@ type Msg =
     | InvoiceMsg of Invoice.Msg
     | InvoicesMsg of Invoices.Msg
     | LoadTotals of AsyncOperationStatus<Result<Invoice.Totals, string>>
-    | ReportRequest of AsyncOperationStatus<Result<string, string>>
+    | ReportRequest of SummaryReportType * AsyncOperationStatus<Result<string, string>>
 
 
 
@@ -88,19 +89,18 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                       ) },
         Cmd.none
 
-    | ReportRequest Started ->
+    | ReportRequest (t, Started) ->
         { model with
               Totals = InProgress(Deferred.toOption model.Totals) },
         Cmd.OfAsync.either
-            invoiceApi.prepareAnnualTaxReportUrl
-            ()
-            (Finished >> ReportRequest)
-            (exceptionToResult >> Finished >> LoadTotals)
-    | ReportRequest (Finished result) ->
+            invoiceApi.prepareSummaryReportUrl
+            t
+            (fun x -> ReportRequest (t, Finished x))
+            (fun x -> ReportRequest (t, Finished (exceptionToResult x)))
+    | ReportRequest (_,Finished result) ->
         result
             |> Result.tee (fun url ->  (Browser.Dom.window.``open`` (url,"_blank")).focus())
             |> ignore
-        //{model with Title = Result.defaultValue "" result}
         model
         , toastMessage result
 
@@ -131,7 +131,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                 Totals.Panel(
                         {
                            Totals = model.Totals |> Deferred.defaultResolved Invoice.TotalsDefault
-                           ReportRequest = fun r -> dispatch <| Msg.ReportRequest Started
+                           ReportRequest = fun r -> dispatch <| Msg.ReportRequest (r,Started)
                         }
                 )
                 Columns.columns [] [

@@ -7,6 +7,7 @@ open GemBox.Spreadsheet
 open LiteDB
 open SummaryReportGenerator
 open FsToolkit.ErrorHandling
+open Shared
 
 let fff<'t> = System.Collections.Generic.List<'t>()
 
@@ -48,38 +49,47 @@ let import () =
 
 
 type Paint =
-    private | Paint' of volume : float * pigment : int
+    private
+    | Paint' of volume: float * pigment: int
 
     member me.Volume =
-        let (Paint' (volume=value)) = me in value
+        let (Paint' (volume = value)) = me in value
 
     member me.Pigment =
-        let (Paint' (pigment=value)) = me in value
+        let (Paint' (pigment = value)) = me in value
 
 
 
 [<EntryPoint>]
 let main argv =
-    let apply f x =
-        Result.bind (fun f' ->
-          Result.bind (fun x' -> Ok (f' x')) x) f
-    let funlol i: Result<unit,string> = Error  $"%i{i}"
-    let tlol =
-        validation {
-            let! s = funlol -1
-            and! k = funlol 0
-            and! z = validation{
-                return!
-                    [1..3]
-                    |> List.map (funlol >> Validation.ofResult)
-                    |> List.reduce (fun a b -> (Validation.zip a b) |> Validation.map(fun x-> ()))
-            }
-//            for i in [1..3] do
-//                and! _ = funlol i
-            return()
-        }
+
     let att =
         File.ReadAllBytes("C:\Users\janst\OneDrive\Dokumenty\Faktury\danovy priznani 2017\penzijko.jpg")
+
+
+    let vatIdResult =
+        (Invoice.createVatId "CZ56464")
+        |> Result.defaultValue (Invoice.VatId "XXX")
+
+    let lol2 =
+        generateTaxAnnouncementReport
+            { Period = Quarter (Invoice.getQuarter DateTime.Now)
+              DateOfFill = DateTime.Now
+              Invoices =
+                  [ { Id = Guid.NewGuid()
+                      AccountingPeriod = DateTime(2021, 12, 31)
+                      ManDays = 22uy
+                      Rate = 8000u
+                      OrderNumber = None
+                      Vat = Some 21uy
+                      Customer =
+                          { IdNumber = 564654u
+                            VatId = vatIdResult
+                            Name = "lol"
+                            Address = "sadasd"
+                            Note = None } } ] }
+        |> Result.tee (fun x -> use x = x in use fileStream = new FileStream(@"C:\Users\janst\Desktop\test.xml", FileMode.Create) in x.CopyTo(fileStream))
+        |> Result.teeError Console.WriteLine
 
     let lol =
         generateAnnualTaxReport
@@ -87,9 +97,8 @@ let main argv =
               ExpensesType = Virtual 60uy
               DateOfFill = DateTime.Now
               TotalEarnings = 1600000u
-              PenzijkoAttachment = att
-               }
-        |> Result.tee (fun x -> x.Save(@"C:\Users\janst\Desktop\test.xml"))
+              PenzijkoAttachment = Some att }
+        |> Result.tee (fun x -> use x = x in use fileStream = new FileStream(@"C:\Users\janst\Desktop\test.xml", FileMode.Create) in x.CopyTo(fileStream))
         |> Result.teeError Console.WriteLine
 
 

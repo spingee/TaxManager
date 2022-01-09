@@ -12,7 +12,7 @@ type Report =
     | Annual
 
 type Props =
-    { Totals: Totals ; ReportRequest: Report -> unit }
+    { Totals: Totals ; ReportRequest: SummaryReportType -> unit }
 
 let Panel =
     FunctionComponent.Of
@@ -39,6 +39,18 @@ let Panel =
 
                         Level.title [] [
                             str <| formatDecimal 2 props.Totals.LastQuarterVat.Value
+                            a [ Href "#"
+                                Title "Send Tax Announcement report to and open financial office form"
+                                OnClick (fun e ->
+                                            e.preventDefault()
+                                            props.ReportRequest QuartalVatAnnounce
+                                          )
+                                ] [
+                                Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsInfo ] ] [
+                                    Fa.i [ Fa.Solid.Building
+                                           Fa.Size Fa.FaExtraSmall ] []
+                                ]
+                            ]
                         ]
                     ]
                 ]
@@ -52,10 +64,10 @@ let Panel =
                         Level.title [] [
                             str <| formatDecimal 2 props.Totals.LastYear.Value
                             a [ Href "#"
-                                Title "Send to and open financial office form"
+                                Title "Send Annual report to and open financial office form"
                                 OnClick (fun e ->
                                             e.preventDefault()
-                                            props.ReportRequest Annual
+                                            props.ReportRequest AnnualTax
                                           )
                                 ] [
                                 Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsInfo ] ] [

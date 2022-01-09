@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Pisemnost nazevSW="EPO MF ČR" verzeSW="41.32.3">
+    <DPHKH1 verzePis="03.01">
+        <VetaD dokument="KH1" k_uladis="DPH" rok="2021" ctvrt="2" d_poddp="05.07.2021" khdph_forma="B"/>
+        <VetaP c_ufo="457" c_pracufo="2608" dic="8304072524" typ_ds="F" titul="Bc." jmeno="Jan" prijmeni="Strnad"
+               ulice="Sportovní" c_orient="28" c_pop="555" naz_obce="TANVALD" psc="46841" stat="ČESKÁ REPUBLIKA"
+               email="spingee@gmail.com" sest_jmeno="Jan" sest_prijmeni="Strnad" sest_telef="724792362"
+               c_telef="724792362" id_dats="en3qcvg"/>
+        <VetaA4 c_radku="1" dic_odb="26775794" c_evid_dd="20210401" dppd="30.04.2021" zakl_dane1="160000" dan1="33600"
+                kod_rezim_pl="0" zdph_44="N"/>
+        <VetaA4 c_radku="2" dic_odb="26775794" c_evid_dd="20210501" dppd="31.05.2021" zakl_dane1="168000" dan1="35280"
+                kod_rezim_pl="0" zdph_44="N"/>
+        <VetaA4 c_radku="3" dic_odb="26775794" c_evid_dd="20210601" dppd="30.06.2021" zakl_dane1="176000" dan1="36960"
+                kod_rezim_pl="0" zdph_44="N"/>
+        <!-- <VetaB3 zakl_dane1="3951.24" dan1="829.74"/>-->
+        <!--<VetaC obrat23="504000" pln23="3951.24" />-->
+    </DPHKH1>
+</Pisemnost>

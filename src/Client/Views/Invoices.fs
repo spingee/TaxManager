@@ -176,17 +176,9 @@ let view =
                                 |> List.map
                                     (fun i ->
                                         tr [] [
-                                            let total = (int i.ManDays) * (int i.Rate)
-
-                                            let vat =
-                                                i.Vat
-                                                |> Option.map (fun v -> (total / 100 * (int v)))
-                                                |> Option.defaultValue 0
-
-                                            let totalVat =
-                                                i.Vat
-                                                |> Option.map (fun v -> total + (total / 100 * (int v)))
-                                                |> Option.defaultValue total
+                                            let total = getTotal i
+                                            let vat = getVatAmount i
+                                            let totalVat = getTotalWithVat i
 
                                             td [] [
                                                 str

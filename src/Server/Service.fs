@@ -7,7 +7,6 @@ open System
 open FsToolkit.ErrorHandling
 open Shared.Invoice
 open SummaryReportGenerator
-open Shared
 
 type DownloadFile =
     { FileName: string
@@ -77,13 +76,32 @@ let generateSummaryReport (connectionString: string) (reportType: SummaryReportT
               DateOfFill = DateTime.Now
               TotalEarnings = getTotal connectionString year
               PenzijkoAttachment = None }
+    | QuartalVatAnnounce ->
+        let quarter = getPreviousQuarter DateTime.Now
+        use db = new LiteDatabase(connectionString)
+
+        db
+            .GetCollection<Dto.Invoice>("invoices")
+            .Query()
+            .Where(fun f ->
+                f.AccountingPeriod.Year = quarter.Start.Year
+                && f.AccountingPeriod.Month >= quarter.Start.Month
+                && f.AccountingPeriod.Month <= quarter.End.Month)
+            .ToArray()
+        |> List.ofSeq
+        |> List.traverseResultA Dto.fromInvoiceDto
+        |> Result.bind
+            (fun is ->
+                generateTaxAnnouncementReport
+                    { Period = Quarter quarter
+                      DateOfFill = DateTime.Now
+                      Invoices = is })
     | _ -> failwith $"Not implemented {reportType}"
 
 
 let generateSummaryReportFile (connectionString: string) (reportType: SummaryReportType) =
     match reportType with
     | AnnualTax ->
-        let year = DateTime.Now.AddYears(-1).Year
 
         generateSummaryReport connectionString reportType
         |> Result.map

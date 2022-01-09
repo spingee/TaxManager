@@ -219,29 +219,11 @@ let invoiceApi =
                   try
                       use db = new LiteDatabase(connectionString)
                       let y = DateTime.Now.AddYears(-1)
-                      let s = DateTime(y.Year, 1, 1)
-                      let e = s.AddYears(1)
 
                       let lastYear = getTotal connectionString y.Year
 
-
-                      let quarterStart, quarterEnd, timeRange =
-                          match DateTime.Now.Month with
-                          | 1
-                          | 2
-                          | 3 -> 10, 12, DateTime.Now.Year - 1, "Q4"
-                          | 4
-                          | 5
-                          | 6 -> 1, 3, DateTime.Now.Year, "Q1"
-                          | 7
-                          | 8
-                          | 9 -> 4, 6, DateTime.Now.Year, "Q2"
-                          | 10
-                          | 11
-                          | 12 -> 7, 9, DateTime.Now.Year, "Q3"
-                          | _ -> failwith "nonsense"
-                          |> fun (s, e, y, r) -> DateTime(y, s, 1), DateTime(y, e, 1).AddMonths(1), r
-
+                      let { Start = quarterStart ; End = quarterEnd; Number = quarter} =
+                          getPreviousQuarter DateTime.Now
 
                       let lastQuarterBase =
                           db
@@ -274,27 +256,21 @@ let invoiceApi =
                             LastQuarter =
                                 { Value = decimal lastQuarter
                                   Currency = "CZK"
-                                  TimeRange = timeRange }
+                                  TimeRange = $"Q{quarter}" }
                             LastQuarterVat =
                                 { Value = decimal lastQuarterVat
                                   Currency = "CZK"
-                                  TimeRange = timeRange } }
+                                  TimeRange = $"Q{quarter}" } }
                           |> Ok
                   with
                   | e -> return Error e.Message
               }
-      prepareAnnualTaxReportUrl =
-          fun () ->
+      prepareSummaryReportUrl =
+          fun type' ->
               async {
                   try
                       let stream =
-                          generateAnnualTaxReport {
-                                Year = DateTime.Now.AddYears(-1).Year |> uint16
-                                ExpensesType = Virtual 60uy
-                                DateOfFill = DateTime.Now
-                                TotalEarnings = 1600000u
-                                PenzijkoAttachment = None
-                          }
+                          generateSummaryReport connectionString type'
 
                       match stream with
                       | Error errs -> return Error (errs |> String.concat Environment.NewLine)
@@ -315,11 +291,7 @@ let invoiceApi =
                                     HttpMethod.Post,
                                     url
                                 )
-
-
                           requestMessage.Content <- content
-
-
 
                           use! response = httpClient.PostAsync(url,content) |> Async.AwaitTask
                           let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
