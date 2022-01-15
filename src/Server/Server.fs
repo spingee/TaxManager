@@ -22,7 +22,7 @@ open System.Globalization
 open Giraffe
 open Auth
 open FSharp.Control.Tasks
-open SummaryReportGenerator
+open Report
 open Service
 //open System.Linq
 

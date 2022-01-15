@@ -20,7 +20,7 @@
         </Content>
 
         <Compile Include="Dto.fs" />
-        <Compile Include="SummaryReportGenerator.fs" />
+        <Compile Include="Report.fs" />
         <Compile Include="InvoiceExcel.fs" />
         <Compile Include="Auth.fs" />
         <Compile Include="Service.fs" />

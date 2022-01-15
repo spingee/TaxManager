@@ -1,6 +1,7 @@
 namespace Shared
 
 open System
+open System.Globalization
 open System.Text.RegularExpressions
 
 
@@ -9,14 +10,10 @@ module Invoice =
     // for not not internal , becouse it wont serialze trough fable.remoting
     type VatId = VatId of string
 
-    type Quarter =
-        { Number: uint
-          Start: DateTime
-          End: DateTime }
+    type Quarter = { Number: uint; Start: DateTime; End: DateTime }
 
     let createVatId str =
-        let legit =
-            Regex("^[A-Z]{2}[A-Z0-9]+$").IsMatch(str)
+        let legit = Regex("^[A-Z]{2}[A-Z0-9]+$").IsMatch(str)
 
         match legit with
         | true -> Ok(VatId str)
@@ -56,10 +53,6 @@ module Invoice =
         | q when q.Number = current -> q
         | _ -> getPreviousQuarter previousMonth
 
-
-
-
-
     type Customer =
         { IdNumber: uint
           VatId: VatId
@@ -76,10 +69,7 @@ module Invoice =
           Vat: uint8 option
           Customer: Customer }
 
-    type TotalPrice =
-        { Value: decimal
-          Currency: string
-          TimeRange: string }
+    type TotalPrice = { Value: decimal; Currency: string; TimeRange: string }
 
     type Totals =
         { LastYear: TotalPrice
@@ -87,18 +77,9 @@ module Invoice =
           LastQuarterVat: TotalPrice }
 
     let TotalsDefault =
-        { LastYear =
-              { Value = 0m
-                Currency = "CZK"
-                TimeRange = "" }
-          LastQuarter =
-              { Value = 0m
-                Currency = "CZK"
-                TimeRange = "" }
-          LastQuarterVat =
-              { Value = 0m
-                Currency = "CZK"
-                TimeRange = "" } }
+        { LastYear = { Value = 0m; Currency = "CZK"; TimeRange = "" }
+          LastQuarter = { Value = 0m; Currency = "CZK"; TimeRange = "" }
+          LastQuarterVat = { Value = 0m; Currency = "CZK"; TimeRange = "" } }
 
     let getInvoiceNumber invoice indexNumber =
         sprintf "%i%02i%02i" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month indexNumber
@@ -117,6 +98,11 @@ module Invoice =
         i.Vat
         |> Option.map (fun v -> total + vat)
         |> Option.defaultValue total
+
+    let getDateOfTaxableSupply (accPeriod: DateTime) =
+        DateTime(int accPeriod.Year, int accPeriod.Month, 1)
+            .AddMonths(1)
+            .AddDays(-1.0)
 
     type SummaryReportType =
         | AnnualTax
@@ -142,5 +128,4 @@ module Invoice =
 
 
 module Route =
-    let builder typeName methodName =
-        sprintf "/api/%s/%s" typeName methodName
+    let builder typeName methodName = sprintf "/api/%s/%s" typeName methodName

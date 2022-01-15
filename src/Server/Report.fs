@@ -1,4 +1,4 @@
-module SummaryReportGenerator
+module Report
 
 open System
 open System.IO
@@ -84,8 +84,6 @@ let generateAnnualTaxReport input =
         DateTime(input.Year |> int, 12, 31)
             .ToString("dd.MM.yyyy")
 
-    //let verzePisemnosti = input.DateOfFill.ToString("dd.MM")
-
     let vetaDEnsureAndSet name value =
         ensureAttrAndSet xml.Dpfdp5.VetaD.XElement name value
 
@@ -133,7 +131,6 @@ let generateAnnualTaxReport input =
             | Real v -> v
 
     validation {
-        //let! _ = ensureAttrAndSet xml.Dpfdp5.XElement "verzePis" verzePisemnosti
         let! _ = vetaDEnsureAndSet "rok" input.Year
         and! _ = vetaDEnsureAndSet "zdobd_od" yearStart
         and! _ = vetaDEnsureAndSet "zdobd_do" yearEnd
@@ -204,11 +201,14 @@ let generateTaxAnnouncementReport (input: TaxAnnouncementInput) =
     |> Seq.map snd
     |> Seq.mapi (fun c i ->
                          let rowNumber = (c + 1) |> decimal |> Some
+                         let vatId = (getVatIdStr i.Customer.VatId).Substring(2)
+                         let dppd = getDateOfTaxableSupply i.AccountingPeriod
+
                          AnnouncementTaxReport.VetaA4(
                             cRadku= rowNumber,
-                            dicOdb = getVatIdStr i.Customer.VatId,
-                            cEvidDd = getInvoiceNumber i 1,
-                            dppd = i.AccountingPeriod.ToString("dd.MM.yyyy"),
+                            dicOdb = vatId,
+                            cEvidDd = getInvoiceNumber i (c + 1),
+                            dppd = dppd.ToString("dd.MM.yyyy"),
                             zaklDane1 = (getTotal i |> decimal |> Some),
                             dan1 = (getVatAmount i |> decimal |> Some),
                             zaklDane2 = None,

@@ -6,7 +6,7 @@ open System.IO
 open System
 open FsToolkit.ErrorHandling
 open Shared.Invoice
-open SummaryReportGenerator
+open Report
 
 type DownloadFile =
     { FileName: string
@@ -79,14 +79,17 @@ let generateSummaryReport (connectionString: string) (reportType: SummaryReportT
     | QuartalVatAnnounce ->
         let quarter = getPreviousQuarter DateTime.Now
         use db = new LiteDatabase(connectionString)
+        let year = quarter.Start.Year
+        let startMonth = quarter.Start.Month
+        let endMonth = quarter.End.AddMonths(-1).Month
 
         db
             .GetCollection<Dto.Invoice>("invoices")
             .Query()
             .Where(fun f ->
-                f.AccountingPeriod.Year = quarter.Start.Year
-                && f.AccountingPeriod.Month >= quarter.Start.Month
-                && f.AccountingPeriod.Month <= quarter.End.Month)
+                f.AccountingPeriod.Year = year
+                && f.AccountingPeriod.Month >= startMonth
+                && f.AccountingPeriod.Month <= endMonth)
             .ToArray()
         |> List.ofSeq
         |> List.traverseResultA Dto.fromInvoiceDto
@@ -100,15 +103,17 @@ let generateSummaryReport (connectionString: string) (reportType: SummaryReportT
 
 
 let generateSummaryReportFile (connectionString: string) (reportType: SummaryReportType) =
-    match reportType with
-    | AnnualTax ->
-
-        generateSummaryReport connectionString reportType
-        |> Result.map
-            (fun s ->
-                { FileName = "dpfdp5_epo2.xml"
-                  ContentType = "application/xml"
-                  Stream = s })
 
 
-    | _ -> failwith $"Not implemented {reportType}"
+    generateSummaryReport connectionString reportType
+    |> Result.map
+        (fun s ->
+            let fileName =
+                match reportType with
+                | AnnualTax -> "dpfdp5_epo2.xml"
+                | QuartalVatAnnounce -> "dphkh1_epo2.xml"
+                | _ -> failwith $"Not implemented {reportType}"
+
+            { FileName = fileName
+              ContentType = "application/xml"
+              Stream = s })

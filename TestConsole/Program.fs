@@ -5,7 +5,7 @@ open FsToolkit.ErrorHandling.Operator.Validation
 open InvoiceExcel
 open GemBox.Spreadsheet
 open LiteDB
-open SummaryReportGenerator
+open Report
 open FsToolkit.ErrorHandling
 open Shared
 
