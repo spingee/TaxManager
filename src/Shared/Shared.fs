@@ -62,9 +62,11 @@ module Invoice =
 
     type Invoice =
         { Id: Guid
+          InvoiceNumber: string
           ManDays: uint8
           Rate: uint32
           AccountingPeriod: DateTime
+          DateOfTaxableSupply: DateTime
           OrderNumber: string option
           Vat: uint8 option
           Customer: Customer }
@@ -81,8 +83,6 @@ module Invoice =
           LastQuarter = { Value = 0m; Currency = "CZK"; TimeRange = "" }
           LastQuarterVat = { Value = 0m; Currency = "CZK"; TimeRange = "" } }
 
-    let getInvoiceNumber invoice indexNumber =
-        sprintf "%i%02i%02i" invoice.AccountingPeriod.Year invoice.AccountingPeriod.Month indexNumber
 
     let getTotal i = (int i.ManDays) * (int i.Rate)
 
@@ -99,10 +99,12 @@ module Invoice =
         |> Option.map (fun v -> total + vat)
         |> Option.defaultValue total
 
-    let getDateOfTaxableSupply (accPeriod: DateTime) =
+    let getLastDayOfMonth (accPeriod: DateTime) =
         DateTime(int accPeriod.Year, int accPeriod.Month, 1)
             .AddMonths(1)
-            .AddDays(-1.0)
+            .AddDays(-1)
+
+
 
     type SummaryReportType =
         | AnnualTax
@@ -115,11 +117,19 @@ module Invoice =
             | nameof (QuartalVatAnnounce) -> QuartalVatAnnounce
             | _ -> failwithf "Not implemented: %s" string
 
+    type AddInvoiceRequest =
+        { ManDays: uint8
+          Rate: uint32
+          AccountingPeriod: DateTime
+          OrderNumber: string option
+          Vat: uint8 option
+          Customer: Customer }
+
     type IInvoiceApi =
-        { addInvoice: Invoice -> Async<Result<Guid, string>>
+        { addInvoice: AddInvoiceRequest -> Async<Result<Invoice, string>>
           getCustomers: unit -> Async<Result<Customer list, string>>
           getInvoices: int -> int -> Async<Result<Invoice list * int, string>>
-          getInvoiceDefaults: unit -> Async<Result<Invoice option, string>>
+          getInvoiceDefaults: unit -> Async<Result<Invoice, string>>
           removeInvoice: Guid -> Async<Result<unit, string>>
           searchOrderNumber: string -> Async<Result<string list, string>>
           getTotals: unit -> Async<Result<Totals, string>>

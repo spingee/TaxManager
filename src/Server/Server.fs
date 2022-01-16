@@ -8,6 +8,8 @@ open System.Xml.Linq
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.Logging
+open Microsoft.FSharp.Core
 open Saturn
 open System
 open Shared
@@ -41,54 +43,40 @@ do SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
 
 
 
+
 let invoiceApi =
     { addInvoice =
-          fun invoice ->
+          fun invoiceReq ->
               async {
                   try
                       use db = new LiteDatabase(connectionString)
+                      let coll = db.GetCollection<Dto.Invoice>("invoices")
 
+                      let dateTaxSupply = getLastDayOfMonth invoiceReq.AccountingPeriod
+                      let invoiceNumber, seqNumber = generateInvoiceNumber coll invoiceReq.AccountingPeriod
 
-                      let invoices =
-                          db.GetCollection<Dto.Invoice>("invoices")
+                      let invoice =
+                          { Id = NewId.NextGuid()
+                            InvoiceNumber = invoiceNumber
+                            ManDays = invoiceReq.ManDays
+                            Rate = invoiceReq.Rate
+                            AccountingPeriod = invoiceReq.AccountingPeriod
+                            DateOfTaxableSupply = dateTaxSupply
+                            OrderNumber = invoiceReq.OrderNumber
+                            Vat = invoiceReq.Vat
+                            Customer = invoiceReq.Customer }
 
-                      let dateYear = invoice.AccountingPeriod.Date.Year
-                      let dateMonth = invoice.AccountingPeriod.Date.Month
-
-                      let samePeriodCount =
-                          invoices
-                              .Query()
-                              .Where(fun f ->
-                                  f.AccountingPeriod.Year = dateYear
-                                  && f.AccountingPeriod.Month = dateMonth)
-                              .Count()
-
-                      let indexNumber = samePeriodCount + 1
+                      invoice |> Dto.toInvoiceDto DateTime.Now |> coll.Insert |> ignore
 
                       let outputFile =
                           Path.Combine(
                               documentOutputDir,
-                              getInvoiceFileName
-                                  invoice.AccountingPeriod.Year
-                                  invoice.AccountingPeriod.Month
-                                  indexNumber
+                              getInvoiceFileName invoiceReq.AccountingPeriod seqNumber
                           )
 
-                      createExcelAndPdfInvoice outputFile invoice indexNumber
+                      createExcelAndPdfInvoice outputFile invoice
 
-
-                      use db = new LiteDatabase(connectionString)
-
-                      let invoices =
-                          db.GetCollection<Dto.Invoice>("invoices")
-
-                      let invoice =
-                          { invoice with Id = NewId.NextGuid() }
-                          |> Dto.toInvoiceDto DateTime.Now
-
-                      invoices.Insert(invoice) |> ignore
-
-                      return Ok invoice.Id
+                      return Ok invoice
                   with
                   | ex -> return Error <| sprintf "%s" ex.Message
               }
@@ -143,7 +131,7 @@ let invoiceApi =
                                .ToArray()
                            |> List.ofSeq
                            |> List.traverseResultM Dto.fromInvoiceDto)
-                           |> Result.map (fun x -> x, total)
+                          |> Result.map (fun x -> x, total)
                   with
                   | e -> return Error e.Message
               }
@@ -151,24 +139,75 @@ let invoiceApi =
           fun () ->
               async {
                   try
-                      let lastMonth= DateTime.Now.AddMonths(-1)
+                      let lastMonth =
+                          DateTime.Now.AddMonths(-1)
+
                       let mandays =
-                        [1..DateTime.DaysInMonth (lastMonth.Year,lastMonth.Month) ]
-                        |> List.filter (fun d -> not ([DayOfWeek.Saturday ; DayOfWeek.Sunday] |> List.contains (DateTime(lastMonth.Year,lastMonth.Month,d).DayOfWeek) ))
-                        |> List.length
-                        |> uint8
+                          [ 1 .. DateTime.DaysInMonth(lastMonth.Year, lastMonth.Month) ]
+                          |> List.filter
+                              (fun d ->
+                                  not (
+                                      [ DayOfWeek.Saturday; DayOfWeek.Sunday ]
+                                      |> List.contains (
+                                          DateOnly(
+                                              lastMonth.Year,
+                                              lastMonth.Month,
+                                              d
+                                          )
+                                              .DayOfWeek
+                                      )
+                                  ))
+                          |> List.length
+                          |> uint8
+
 
                       use db = new LiteDatabase(connectionString)
+
+                      let coll =
+                          db.GetCollection<Dto.Invoice>("invoices")
+
+                      let invoiceNumber, _ = generateInvoiceNumber coll lastMonth
+
+                      let dateOfTaxSupply = getLastDayOfMonth lastMonth
+
+
                       return
-                          (db
-                              .GetCollection<Dto.Invoice>("invoices")
-                               .Query()
+                          (coll
+                              .Query()
                                .OrderByDescending(fun x -> x.AccountingPeriod)
-                               .FirstOrDefault()//
-                               |> (fun x -> if ((box x) = null) then None else Some x)
-                               |> Option.map (fun x-> {x with ManDays = mandays ; AccountingPeriod = lastMonth})
-                               |> Option.traverseResult Dto.fromInvoiceDto
+                               .FirstOrDefault() //
+                           |> (fun x ->
+                               if ((box x) = null) then
+                                   None
+                               else
+                                   Some x)
+                           |> Option.map
+                               (fun x ->
+                                   { x with
+                                         ManDays = mandays
+                                         AccountingPeriod = lastMonth
+                                         InvoiceNumber = invoiceNumber
+                                         DateOfTaxableSupply = dateOfTaxSupply }
+                                   |> Dto.fromInvoiceDto)
+
+                           |> Option.defaultValue (
+                               Ok
+                                   { Invoice.Id = Guid.Empty
+                                     Rate = 6000u
+                                     OrderNumber = None
+                                     Vat = Some 21uy
+                                     Customer =
+                                         { IdNumber = 0u
+                                           VatId = VatId "CZ0000"
+                                           Name = "Some customer"
+                                           Address = ""
+                                           Note = None }
+                                     ManDays = mandays
+                                     AccountingPeriod = lastMonth
+                                     InvoiceNumber = invoiceNumber
+                                     DateOfTaxableSupply = getLastDayOfMonth lastMonth }
                            )
+                          )
 
                   with
                   | e -> return Error e.Message
@@ -222,7 +261,9 @@ let invoiceApi =
 
                       let lastYear = getTotal connectionString y.Year
 
-                      let { Start = quarterStart ; End = quarterEnd; Number = quarter} =
+                      let { Start = quarterStart
+                            End = quarterEnd
+                            Number = quarter } =
                           getPreviousQuarter DateTime.Now
 
                       let lastQuarterBase =
@@ -273,64 +314,85 @@ let invoiceApi =
                           generateSummaryReport connectionString type'
 
                       match stream with
-                      | Error errs -> return Error (errs |> String.concat Environment.NewLine)
+                      | Error errs -> return Error(errs |> String.concat Environment.NewLine)
                       | Ok stream ->
 
                           use stream = stream
                           do stream.Position <- 0L
 
                           use content = new StreamContent(stream)
-                          content.Headers.Add("Content-Type","application/xml")
+                          content.Headers.Add("Content-Type", "application/xml")
                           let httpClientHandler = new HttpClientHandler()
                           use httpClient = new HttpClient(httpClientHandler)
 
 
-                          let url = "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
+                          let url =
+                              "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
+
                           use requestMessage =
-                                new HttpRequestMessage(
-                                    HttpMethod.Post,
-                                    url
-                                )
+                              new HttpRequestMessage(HttpMethod.Post, url)
+
                           requestMessage.Content <- content
 
-                          use! response = httpClient.PostAsync(url,content) |> Async.AwaitTask
-                          let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                          use! response =
+                              httpClient.PostAsync(url, content)
+                              |> Async.AwaitTask
+
+                          let! body =
+                              response.Content.ReadAsStringAsync()
+                              |> Async.AwaitTask
+
                           if (not response.IsSuccessStatusCode) then
-                             return Error $"Remote api error {body}"
+                              return Error $"Remote api error {body}"
                           else
-                            let url =
-                                (XDocument.Parse body).Root.Value
-                            return Ok url
+                              let url = (XDocument.Parse body).Root.Value
+                              return Ok url
                   with
-                  | e -> return Error (e.Message + e.StackTrace)
-              }
-          }
+                  | e -> return Error(e.Message + e.StackTrace)
+              } }
 
 let downloadHandler file : HttpHandler =
-        fun (next : HttpFunc) (ctx : HttpContext) ->
-            task {
-                ctx.SetHttpHeader("Content-Disposition", $"inline; filename=\"{file.FileName}\"")
-                ctx.SetHttpHeader("Content-Type", file.ContentType)
-                use stream = file.Stream
-                return! streamData false stream None None next ctx
-            }
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
+            ctx.SetHttpHeader("Content-Disposition", $"inline; filename=\"{file.FileName}\"")
+            ctx.SetHttpHeader("Content-Type", file.ContentType)
+            use stream = file.Stream
+            return! streamData false stream None None next ctx
+        }
 
 
 
-let summaryReportHandler =  SummaryReportType.fromString
-                            >> generateSummaryReportFile connectionString
-                            >> Result.map downloadHandler
-                            >> Result.valueOr (fun e -> setStatusCode 500 >=> text (String.concat "\n" e))
+let summaryReportHandler =
+    SummaryReportType.fromString
+    >> generateSummaryReportFile connectionString
+    >> Result.map downloadHandler
+    >> Result.valueOr (fun e -> setStatusCode 500 >=> text (String.concat "\n" e))
+
+let errorHandler (ex: Exception)
+                 (routeInfo: RouteInfo<HttpContext>) =
+
+    let contextLogger = routeInfo.httpContext.GetLogger()
+
+    let errorMsgTemplate = "Error occured while invoking {MethodName} at {RoutePath}"
+    contextLogger.Log(LogLevel.Error,ex.Message)
+    Ignore
 
 
 let webApp =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.fromValue invoiceApi
+    |> Remoting.withErrorHandler errorHandler
     |> Remoting.buildHttpHandler
+
 let router =
-    choose [ GET  >=> routef "/api/generateInvoiceDocument/%O" (generateInvoiceExcel connectionString >> downloadHandler)
-             GET  >=> routef "/api/generateSummaryReport/%s" summaryReportHandler
+    choose [ GET
+             >=> routef
+                     "/api/generateInvoiceDocument/%O"
+                     (generateInvoiceExcel connectionString
+                      >> downloadHandler)
+             GET
+             >=> routef "/api/generateSummaryReport/%s" summaryReportHandler
              routeStartsWith "/api" >=> webApp
              setStatusCode 404 >=> text "Not found" ]
 

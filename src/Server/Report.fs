@@ -202,13 +202,12 @@ let generateTaxAnnouncementReport (input: TaxAnnouncementInput) =
     |> Seq.mapi (fun c i ->
                          let rowNumber = (c + 1) |> decimal |> Some
                          let vatId = (getVatIdStr i.Customer.VatId).Substring(2)
-                         let dppd = getDateOfTaxableSupply i.AccountingPeriod
 
                          AnnouncementTaxReport.VetaA4(
                             cRadku= rowNumber,
                             dicOdb = vatId,
-                            cEvidDd = getInvoiceNumber i (c + 1),
-                            dppd = dppd.ToString("dd.MM.yyyy"),
+                            cEvidDd = i.InvoiceNumber,
+                            dppd = i.DateOfTaxableSupply.ToString("dd.MM.yyyy"),
                             zaklDane1 = (getTotal i |> decimal |> Some),
                             dan1 = (getVatAmount i |> decimal |> Some),
                             zaklDane2 = None,
@@ -236,10 +235,6 @@ let generateTaxAnnouncementReport (input: TaxAnnouncementInput) =
     |> Result.map
         (fun _ ->
             let stream = new MemoryStream()
-            //let fileStream = new FileStream(@"C:\Users\janst\Desktop\test2.xml", FileMode.Create,FileAccess.Write)
-            //xml.XElement.Document.Save(@"C:\Users\janst\Desktop\test2.xml")
             xml.XElement.Document.Save(stream)
             stream.Position <- 0L
-
-            //stream.CopyTo(fileStream)
             stream)

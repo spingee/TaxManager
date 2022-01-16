@@ -180,9 +180,10 @@ let view =
                                             let vat = getVatAmount i
                                             let totalVat = getTotalWithVat i
 
+                                            let iAccountingPeriod = i.AccountingPeriod.ToLocalTime()
                                             td [] [
                                                 str
-                                                <| sprintf "%i/%i" i.AccountingPeriod.Year i.AccountingPeriod.Month
+                                                <| sprintf "%i/%i" iAccountingPeriod.Year iAccountingPeriod.Month
                                             ]
 
                                             td [] [ str <| i.Rate.ToString() ]

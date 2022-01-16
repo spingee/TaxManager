@@ -51,7 +51,7 @@ let isModelValid model =
     && Option.isSome model.SelectedCustomer
 
 type Msg =
-    | AddInvoice of AsyncOperationStatus<Invoice.Invoice * Result<Guid, string>>
+    | AddInvoice of AsyncOperationStatus<Result<Invoice, string>>
     | SetRate of string
     | SetAccPeriod of DateTime
     | SetManDays of string
@@ -64,7 +64,7 @@ type Msg =
     | CustomerMsg of Customer.Msg
     | VatApplicable of bool
     | SearchBoxMsg of SearchBox.Msg
-    | LoadDefaults of AsyncOperationStatus<Result<Invoice.Invoice option, string>>
+    | LoadDefaults of AsyncOperationStatus<Result<Invoice.Invoice, string>>
 
 type ExtMsg =
     | NoOp
@@ -105,7 +105,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
     let modelInvoiceInput = model
 
     match msg with
-    | AddInvoice (Finished (inv, result)) ->
+    | AddInvoice (Finished result) ->
         { model with
               Result =
                   match result with
@@ -114,9 +114,8 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
               IsReadOnly = false },
         toastMessage result,
         match result with
-        | Ok id ->
-            let inv = { inv with Id = id }
-            InvoiceAdded inv
+        | Ok i ->
+            InvoiceAdded i
         | _ -> NoOp
     | AddInvoice Started ->
         let inv =
@@ -133,8 +132,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                 and! vat = modelInvoiceInput.Vat.Parsed
 
                 return
-                    { Id = Guid.NewGuid()
-                      Customer = customer
+                    { Customer = customer
                       Rate = rateParsed
                       ManDays = manDaysParsed
                       AccountingPeriod = modelInvoiceInput.AccountingPeriod
@@ -153,9 +151,9 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                 Cmd.OfAsync.either
                     invoiceApi.addInvoice
                     inv
-                    (fun r -> Finished(inv, r) |> AddInvoice)
+                    (fun r -> Finished(r) |> AddInvoice)
                     (exceptionToResult
-                     >> (fun r -> Finished(inv, r) |> AddInvoice))
+                     >> (fun r -> Finished(r) |> AddInvoice))
 
             model, cmd, NoOp
         | Error str -> { model with Result = Some(Error str) }, Cmd.none, NoOp
@@ -306,7 +304,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
     | LoadDefaults (Finished result) ->
         let model =
             match result with
-            | Ok (Some i) ->
+            | Ok  i ->
                 { model with
                       Rate = Validated.success (i.Rate.ToString()) i.Rate
                       SelectedCustomer = Some i.Customer
@@ -319,10 +317,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                                    | Some o -> o
                                    | _ -> "")
                               i.OrderNumber }
-            | Error e ->
-                { model with
-                      Result = Some(Error [ e ]) }
-            | _ -> model
+            | Error e ->  { model with  Result = Some(Error [ e ]) }
 
         model, Cmd.none, NoOp
 

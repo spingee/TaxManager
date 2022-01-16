@@ -16,11 +16,13 @@ type Customer =
 [<CLIMutable>]
 type Invoice =
     { Id: Guid
+      InvoiceNumber: string
       ManDays: uint8
       Rate: uint32
       AccountingPeriod: DateTime
+      DateOfTaxableSupply: DateTime
       OrderNumber: string
-      Vat : Nullable<int>
+      Vat: Nullable<int>
       Customer: Customer
       Inserted: DateTime }
 
@@ -44,13 +46,23 @@ let toInvoiceDto inserted (invoice: Invoice.Invoice) : Invoice =
           VatId = Invoice.getVatIdStr invoice.Customer.VatId
           Name = invoice.Customer.Name
           Address = invoice.Customer.Address
-          Note = invoice.Customer.Note |> function | None -> null | Some s -> s }
+          Note =
+              invoice.Customer.Note
+              |> function
+                  | None -> null
+                  | Some s -> s }
 
     { Id = invoice.Id
+      InvoiceNumber = invoice.InvoiceNumber
       ManDays = invoice.ManDays
       Rate = invoice.Rate
       AccountingPeriod = invoice.AccountingPeriod
-      OrderNumber = invoice.OrderNumber |> function | None -> null | Some s -> s
+      DateOfTaxableSupply = invoice.DateOfTaxableSupply
+      OrderNumber =
+          invoice.OrderNumber
+          |> function
+              | None -> null
+              | Some s -> s
       Vat = invoice.Vat |> Option.map int |> Option.toNullable
       Customer = customer
       Inserted = inserted }
@@ -59,12 +71,20 @@ let fromInvoiceDto (dto: Invoice) =
     result {
         let! customer = fromCustomerDto dto.Customer
 
+        let! invoiceNumber =
+            if String.IsNullOrEmpty(dto.InvoiceNumber) then
+                Error $"Invoice number is null {dto}"
+            else
+                Ok dto.InvoiceNumber
+
         let invoice: Invoice.Invoice =
             { Id = dto.Id
+              InvoiceNumber = invoiceNumber
               ManDays = dto.ManDays
               Rate = dto.Rate
               AccountingPeriod = dto.AccountingPeriod
-              OrderNumber= Option.ofObj dto.OrderNumber
+              DateOfTaxableSupply = dto.DateOfTaxableSupply
+              OrderNumber = Option.ofObj dto.OrderNumber
               Vat = dto.Vat |> Option.ofNullable |> Option.map uint8
               Customer = customer }
 

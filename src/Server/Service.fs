@@ -13,8 +13,36 @@ type DownloadFile =
       ContentType: string
       Stream: Stream }
 
-let getInvoiceFileName year month index =
-    sprintf "Faktura - %i-%02i-%02i" year month index
+let generateInvoiceNumber (coll:ILiteCollection<Dto.Invoice>) (period:DateTime) =
+      let y = period.Year
+      let m = period.Month
+      let invoicesOfPeriod =
+          coll
+              .Query()
+              .Where(fun f ->
+                  f.AccountingPeriod.Year = y
+                  && f.AccountingPeriod.Month = m)
+              .ToArray()
+
+      let rec getInvoiceNumber (invoices: Dto.Invoice seq) sequenceNumber =
+          let invNumber =
+              sprintf "%i%02i%02i" period.Year period.Month sequenceNumber
+
+          let result =
+              invoices
+              |> Seq.tryFind
+                  (fun i -> (String.IsNullOrEmpty(i.InvoiceNumber) = false)
+                            && i.InvoiceNumber.Equals(invNumber, StringComparison.OrdinalIgnoreCase))
+
+          match result with
+          | None -> invNumber, sequenceNumber
+          | Some _ -> getInvoiceNumber invoices (sequenceNumber + 1)
+
+      getInvoiceNumber invoicesOfPeriod 1
+
+
+let getInvoiceFileName (period:DateTime) index =
+    sprintf "Faktura - %i-%02i-%02i" period.Year period.Month index
 
 let getTotal (connectionString: string) year =
     use db = new LiteDatabase(connectionString)
@@ -37,28 +65,16 @@ let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
 
     let invoices =
         db.GetCollection<Dto.Invoice>("invoices")
-
-
     let invoiceDto = invoices.FindById(BsonValue(invoiceId))
-
-    let index =
-        invoices
-            .Query()
-            .Where(fun f ->
-                f.AccountingPeriod.Year = invoiceDto.AccountingPeriod.Year
-                && f.AccountingPeriod.Month = invoiceDto.AccountingPeriod.Month)
-            .OrderBy(fun inv -> inv.Inserted)
-            .ToArray()
-        |> Array.findIndex (fun inv -> inv.Id = invoiceId)
 
     let invoice =
         Dto.fromInvoiceDto invoiceDto
         |> Result.valueOr failwith
 
-    let fileName =
-        getInvoiceFileName invoiceDto.AccountingPeriod.Year invoiceDto.AccountingPeriod.Month (index + 1)
+    let fileName = invoice.InvoiceNumber
 
-    let stream = generateExcelData invoice (index + 1)
+
+    let stream = generateExcelData invoice
 
     { FileName = fileName
       ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

@@ -9,7 +9,6 @@ open FsToolkit.ErrorHandling
 open Fulma
 open Elmish
 open Fable.React
-
 type Model =
     { IdNumber: Validated<uint>
       VatId: Validated<VatId>
@@ -26,12 +25,11 @@ let toCustomerInput (customer: Customer) =
       Note =
           Validated.success
               (Option.map id customer.Note
-               |> Option.defaultValue "")
+               |> Option.defaultValue null)
               customer.Note
       IsActive = true }
 
 let fromCustomerInput (custInput: Model) =
-    //{ Customer.IdNumber = 4554u; VatId = VatId "CZ4564";Name = "name"; Address = "address"; Note = Some "note" }
     validation {
         let! idNumber = custInput.IdNumber.Parsed
         and! vatId = custInput.VatId.Parsed
@@ -52,7 +50,7 @@ let defaultInput =
       VatId = Validated.createEmpty ()
       Name = Validated.createEmpty ()
       Address = Validated.createEmpty ()
-      Note = Validated.createEmpty ()
+      Note = Validated.success "" None
       IsActive = true }
 
 let init () =
@@ -60,7 +58,7 @@ let init () =
 
 let isValid input =
     match fromCustomerInput input with
-    | Ok _ -> true
+    | Ok _ ->  true
     | Error _ -> false
 
 type Msg =

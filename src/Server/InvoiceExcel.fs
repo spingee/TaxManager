@@ -80,13 +80,12 @@ let determineExcelVariant (ws: ExcelWorksheet) =
         | obj when obj.Equals("Fakturovaná částka celkem") -> Old
         | _ -> Adcon
 
-let generateWorkBook invoice indexNumber =
+let generateWorkBook (invoice:Invoice) =
     let path = Path.GetFullPath("InvoiceTemplate.xlsx")
     let workbook = ExcelFile.Load(path)
 
 
     let ws = workbook.Worksheets.[0]
-    let invoiceNumber = getInvoiceNumber invoice indexNumber
 
     let date =
         DateTime(
@@ -96,7 +95,7 @@ let generateWorkBook invoice indexNumber =
             CultureInfo("cs-CZ").Calendar
         )
 
-    let dateOfTaxableSupply = getDateOfTaxableSupply invoice.AccountingPeriod
+
     let dueDate = date.AddMonths(1).AddDays(3.0)
     let sumWithoutTax = int invoice.Rate * int invoice.ManDays
 
@@ -114,11 +113,11 @@ let generateWorkBook invoice indexNumber =
             .ShortDatePattern
 
     let total = float sumWithoutTax + vat
-    ws.Cells.["D2"].Value <- invoiceNumber
-    ws.Cells.["D5"].Value <- invoiceNumber
-    ws.Cells.["C15"].Value <- dateOfTaxableSupply.ToString(shortDatePattern)
+    ws.Cells.["D2"].Value <- invoice.InvoiceNumber
+    ws.Cells.["D5"].Value <- invoice.InvoiceNumber
+    ws.Cells.["C15"].Value <- invoice.DateOfTaxableSupply.ToString(shortDatePattern)
     ws.Cells.["C16"].Value <- dueDate.ToString(shortDatePattern)
-    ws.Cells.["C18"].Value <- dateOfTaxableSupply.ToString(shortDatePattern)
+    ws.Cells.["C18"].Value <- invoice.DateOfTaxableSupply.ToString(shortDatePattern)
 
     ws.Cells.["A20"].Value <- sprintf
                                   "Programové práce za měsíc %i/%i"
@@ -162,101 +161,15 @@ let generateWorkBook invoice indexNumber =
     ws.PrintOptions.FitWorksheetHeightToPages <- 1
     workbook
 
-let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice indexNumber =
-    let workbook = generateWorkBook invoice indexNumber
+let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice =
+    let workbook = generateWorkBook invoice
     workbook.Save(sprintf "%s.xlsx" destFileWithoutExtension)
     workbook.Save(sprintf "%s.pdf" destFileWithoutExtension)
 
-let generateExcelData invoice indexNumber =
-    let workbook = generateWorkBook invoice indexNumber
+let generateExcelData invoice =
+    let workbook = generateWorkBook invoice
     let stream = new MemoryStream()
     workbook.Save(stream, SaveOptions.XlsxDefault)
     stream
 
-let readFromExcel file =
-    let workbook = ExcelFile.Load(path = file)
-    let ws = workbook.Worksheets.[0]
-    let excelVariant = determineExcelVariant ws
 
-    let accPeriod =
-        parseAccPeriodFromInvNumber (ws.Cells.["D2"].Value.ToString())
-
-    let manDays =
-        match excelVariant with
-        | New -> parseManDays (ws.Cells.["A23"].Value.ToString())
-        | Adcon
-        | Old -> parseManDays (ws.Cells.["A22"].Value.ToString())
-        | LogicPoint20091201 ->
-            parseManDays (ws.Cells.["A22"].Value.ToString())
-            + parseManDays (ws.Cells.["A26"].Value.ToString())
-        | LogicPoint20110602
-        | LogicPoint20111001 -> 1uy
-
-
-    let rate =
-        match excelVariant with
-        | New -> parseRate (ws.Cells.["A24"].Value.ToString())
-        | Adcon -> parseRate (ws.Cells.["A23"].Value.ToString())
-        | Old -> uint32 (parseTotal (ws.Cells.["D25"].Value.ToString()) / uint32 manDays)
-        | LogicPoint20091201 -> uint32 (parseTotal (ws.Cells.["D28"].Value.ToString()) / uint32 manDays)
-        | LogicPoint20110602 -> uint32 50000
-        | LogicPoint20111001 -> uint32 140000
-
-    let orderNumber =
-        match ws.Cells.["B23"].Value with
-        | null ->
-            match ws.Cells.["A21"].Value with
-            | null -> None
-            | obj -> parseOrderNumber (obj.ToString())
-        | obj -> parseOrderNumber (obj.ToString())
-
-    let vat =
-        match excelVariant with
-        | New -> parseVat (ws.Cells.["B26"].Value.ToString()) |> Some
-        | Adcon -> parseVat (ws.Cells.["B25"].Value.ToString()) |> Some
-        | Old
-        | LogicPoint20091201
-        | LogicPoint20110602 -> None
-        | LogicPoint20111001 -> Some 20uy
-
-    let custNote =
-        match ws.Cells.["C13"].Value with
-        | null -> None
-        | obj -> Some(obj.ToString())
-
-    let custId = uint (ws.Cells.["D7"].Value.ToString())
-
-    let vatId =
-        createVatId (ws.Cells.["D8"].Value.ToString())
-        |> Result.valueOr failwith
-
-    let address =
-        match excelVariant with
-        | New ->
-            let main = ws.Cells.["C11"].Value.ToString()
-            let postal = ws.Cells.["C12"].Value :?> String
-
-            if (not (String.IsNullOrEmpty(postal)) && main <> postal) then
-                $"{main} {postal}"
-            else
-                main
-        | Adcon
-        | Old
-        | LogicPoint20091201
-        | LogicPoint20110602
-        | LogicPoint20111001 -> sprintf "%s %s" (ws.Cells.["C11"].Value.ToString()) (ws.Cells.["C12"].Value.ToString())
-
-    let cust =
-        { Name = ws.Cells.["C10"].Value.ToString()
-          IdNumber = custId
-          Address = address
-          VatId = vatId
-          Note = custNote }
-
-    { Id = Guid.NewGuid()
-      AccountingPeriod = accPeriod
-      ManDays = manDays
-      Rate = rate
-      OrderNumber = orderNumber
-      Vat = vat
-      Customer = cust }
