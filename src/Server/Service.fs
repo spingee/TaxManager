@@ -13,35 +13,37 @@ type DownloadFile =
       ContentType: string
       Stream: Stream }
 
-let generateInvoiceNumber (coll:ILiteCollection<Dto.Invoice>) (period:DateTime) =
-      let y = period.Year
-      let m = period.Month
-      let invoicesOfPeriod =
-          coll
-              .Query()
-              .Where(fun f ->
-                  f.AccountingPeriod.Year = y
-                  && f.AccountingPeriod.Month = m)
-              .ToArray()
+let generateInvoiceNumber (coll: ILiteCollection<Dto.Invoice>) (period: DateTime) =
+    let y = period.Year
+    let m = period.Month
 
-      let rec getInvoiceNumber (invoices: Dto.Invoice seq) sequenceNumber =
-          let invNumber =
-              sprintf "%i%02i%02i" period.Year period.Month sequenceNumber
+    let invoicesOfPeriod =
+        coll
+            .Query()
+            .Where(fun f ->
+                f.AccountingPeriod.Year = y
+                && f.AccountingPeriod.Month = m)
+            .ToArray()
 
-          let result =
-              invoices
-              |> Seq.tryFind
-                  (fun i -> (String.IsNullOrEmpty(i.InvoiceNumber) = false)
-                            && i.InvoiceNumber.Equals(invNumber, StringComparison.OrdinalIgnoreCase))
+    let rec getInvoiceNumber (invoices: Dto.Invoice seq) sequenceNumber =
+        let invNumber =
+            sprintf "%i%02i%02i" period.Year period.Month sequenceNumber
 
-          match result with
-          | None -> invNumber, sequenceNumber
-          | Some _ -> getInvoiceNumber invoices (sequenceNumber + 1)
+        let result =
+            invoices
+            |> Seq.tryFind
+                (fun i ->
+                    (String.IsNullOrEmpty(i.InvoiceNumber) = false)
+                    && i.InvoiceNumber.Equals(invNumber, StringComparison.OrdinalIgnoreCase))
 
-      getInvoiceNumber invoicesOfPeriod 1
+        match result with
+        | None -> invNumber, sequenceNumber
+        | Some _ -> getInvoiceNumber invoices (sequenceNumber + 1)
+
+    getInvoiceNumber invoicesOfPeriod 1
 
 
-let getInvoiceFileName (period:DateTime) index =
+let getInvoiceFileName (period: DateTime) index =
     sprintf "Faktura - %i-%02i-%02i" period.Year period.Month index
 
 let getTotal (connectionString: string) year =
@@ -65,6 +67,7 @@ let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
 
     let invoices =
         db.GetCollection<Dto.Invoice>("invoices")
+
     let invoiceDto = invoices.FindById(BsonValue(invoiceId))
 
     let invoice =
@@ -82,17 +85,8 @@ let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
 
 
 let generateSummaryReport (connectionString: string) (reportType: SummaryReportType) =
-    match reportType with
-    | AnnualTax ->
-        let year = DateTime.Now.AddYears(-1).Year
 
-        generateAnnualTaxReport
-            { Year = year |> uint16
-              ExpensesType = Virtual 60uy
-              DateOfFill = DateTime.Now
-              TotalEarnings = getTotal connectionString year
-              PenzijkoAttachment = None }
-    | QuartalVatAnnounce ->
+    let getVatInput =
         let quarter = getPreviousQuarter DateTime.Now
         use db = new LiteDatabase(connectionString)
         let year = quarter.Start.Year
@@ -109,12 +103,32 @@ let generateSummaryReport (connectionString: string) (reportType: SummaryReportT
             .ToArray()
         |> List.ofSeq
         |> List.traverseResultA Dto.fromInvoiceDto
-        |> Result.bind
+        |> Result.map
             (fun is ->
-                generateTaxAnnouncementReport
-                    { Period = Quarter quarter
-                      DateOfFill = DateTime.Now
-                      Invoices = is })
+                { Period = Quarter quarter
+                  DateOfFill = DateTime.Now
+                  Invoices = is })
+
+    match reportType with
+    | AnnualTax ->
+        let year = DateTime.Now.AddYears(-1).Year
+
+        generateAnnualTaxReport
+            { Year = year |> uint16
+              ExpensesType = Virtual 60uy
+              DateOfFill = DateTime.Now
+              TotalEarnings = getTotal connectionString year
+              PenzijkoAttachment = None }
+    | QuartalVatAnnounce ->
+        getVatInput
+        |> Result.bind generateVatAnnouncementReport
+    | QuartalVat ->
+        getVatInput
+        |> Result.bind generateVatReport
+
+
+
+
     | _ -> failwith $"Not implemented {reportType}"
 
 

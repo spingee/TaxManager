@@ -72,7 +72,7 @@ let main argv =
         |> Result.defaultValue (Invoice.VatId "XXX")
 
     let lol2 =
-        generateTaxAnnouncementReport
+        generateVatAnnouncementReport
             { Period = Quarter (Invoice.getQuarter DateTime.Now)
               DateOfFill = DateTime.Now
               Invoices =

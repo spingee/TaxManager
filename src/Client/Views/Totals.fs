@@ -8,11 +8,11 @@ open Fulma
 open Utils
 open Fable.FontAwesome
 
-type Report =
-    | Annual
+type Report = | Annual
 
 type Props =
-    { Totals: Totals ; ReportRequest: SummaryReportType -> unit }
+    { Totals: Totals
+      ReportRequest: SummaryReportType -> unit }
 
 let Panel =
     FunctionComponent.Of
@@ -21,8 +21,7 @@ let Panel =
                 Level.item [ Level.Item.HasTextCentered ] [
                     div [] [
                         Level.heading [ Modifiers [ Modifier.TextColor IsPrimary ] ] [
-                            str
-                            <| sprintf "Last quarter (%s)" props.Totals.LastQuarter.TimeRange
+                            str <| sprintf "Last quarter (%s)" props.Totals.LastQuarter.TimeRange
                         ]
 
                         Level.title [] [
@@ -41,14 +40,22 @@ let Panel =
                             str <| formatDecimal 2 props.Totals.LastQuarterVat.Value
                             a [ Href "#"
                                 Title "Send Tax Announcement report to and open financial office form"
-                                OnClick (fun e ->
-                                            e.preventDefault()
-                                            props.ReportRequest QuartalVatAnnounce
-                                          )
-                                ] [
+                                OnClick
+                                    (fun e ->
+                                        e.preventDefault ()
+                                        props.ReportRequest QuartalVatAnnounce) ] [
                                 Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsInfo ] ] [
-                                    Fa.i [ Fa.Solid.Building
-                                           Fa.Size Fa.FaExtraSmall ] []
+                                    Fa.i [ Fa.Solid.Building; Fa.Size Fa.FaExtraSmall ] []
+                                ]
+                            ]
+                            a [ Href "#"
+                                Title "Send Tax report to and open financial office form"
+                                OnClick
+                                    (fun e ->
+                                        e.preventDefault ()
+                                        props.ReportRequest QuartalVat) ] [
+                                Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsSuccess ] ] [
+                                    Fa.i [ Fa.Solid.Building; Fa.Size Fa.FaExtraSmall ] []
                                 ]
                             ]
                         ]
@@ -57,22 +64,19 @@ let Panel =
                 Level.item [ Level.Item.HasTextCentered ] [
                     div [] [
                         Level.heading [ Modifiers [ Modifier.TextColor IsPrimary ] ] [
-                            str
-                            <| sprintf "Last year (%s)" props.Totals.LastYear.TimeRange
+                            str <| sprintf "Last year (%s)" props.Totals.LastYear.TimeRange
                         ]
 
                         Level.title [] [
                             str <| formatDecimal 2 props.Totals.LastYear.Value
                             a [ Href "#"
                                 Title "Send Annual report to and open financial office form"
-                                OnClick (fun e ->
-                                            e.preventDefault()
-                                            props.ReportRequest AnnualTax
-                                          )
-                                ] [
+                                OnClick
+                                    (fun e ->
+                                        e.preventDefault ()
+                                        props.ReportRequest AnnualTax) ] [
                                 Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsInfo ] ] [
-                                    Fa.i [ Fa.Solid.Building
-                                           Fa.Size Fa.FaExtraSmall ] []
+                                    Fa.i [ Fa.Solid.Building; Fa.Size Fa.FaExtraSmall ] []
                                 ]
                             ]
                         ]

@@ -11,8 +11,10 @@ open Shared.Invoice
 type AnnualTaxReport =
     XmlProvider<Schema="./Xsd/dpfdp5_epo2.xsd", ResolutionFolder=const(__SOURCE_DIRECTORY__), Encoding="UTF-8">
 
-type AnnouncementTaxReport =
+type AnnouncementVatReport =
     XmlProvider<Schema="./Xsd/dphkh1_epo2.xsd", ResolutionFolder=const(__SOURCE_DIRECTORY__), Encoding="UTF-8">
+type VatReport =
+    XmlProvider<Schema="./Xsd/dphdp3_epo2.xsd", ResolutionFolder=const(__SOURCE_DIRECTORY__), Encoding="UTF-8">
 
 type Period = Quarter of Quarter
 
@@ -168,16 +170,16 @@ let generateAnnualTaxReport input =
             stream.Position <- 0L
             stream)
 
-type TaxAnnouncementInput =
+type VatInput =
     { Period: Period
       DateOfFill: DateTime
       Invoices: Invoice list }
 
-let generateTaxAnnouncementReport (input: TaxAnnouncementInput) =
+let generateVatAnnouncementReport (input: VatInput) =
     let stream =
         File.OpenRead("./Xsd/dphkh1_epo2_sample.xml")
 
-    let xml = AnnouncementTaxReport.Load(stream)
+    let xml = AnnouncementVatReport.Load(stream)
 
 
     let vetaDEnsureAndSet name value =
@@ -203,7 +205,7 @@ let generateTaxAnnouncementReport (input: TaxAnnouncementInput) =
                          let rowNumber = (c + 1) |> decimal |> Some
                          let vatId = (getVatIdStr i.Customer.VatId).Substring(2)
 
-                         AnnouncementTaxReport.VetaA4(
+                         AnnouncementVatReport.VetaA4(
                             cRadku= rowNumber,
                             dicOdb = vatId,
                             cEvidDd = i.InvoiceNumber,
@@ -224,6 +226,59 @@ let generateTaxAnnouncementReport (input: TaxAnnouncementInput) =
     validation {
         let! _ = vetaDEnsureAndSet "d_poddp" dateOfFill
 
+        and! _ =
+            match input.Period with
+            | Quarter quarter ->
+                vetaDEnsureAndSet "ctvrt" quarter.Number
+                <+> vetaDEnsureAndSet "rok" quarter.Start.Year
+
+        return ()
+    }
+    |> Result.map
+        (fun _ ->
+            let stream = new MemoryStream()
+            xml.XElement.Document.Save(stream)
+            stream.Position <- 0L
+            stream)
+
+
+let generateVatReport (input: VatInput) =
+    let stream =
+        File.OpenRead("./Xsd/dphdp3_epo2_sample.xml")
+
+    let xml = VatReport.Load(stream)
+
+
+    let vetaDEnsureAndSet name value =
+        ensureAttrAndSet xml.Dphdp3.VetaD.XElement name value
+
+    let veta1EnsureAndSet name value =
+        ensureAttrAndSet xml.Dphdp3.Veta1.Value.XElement name value
+
+    let veta6EnsureAndSet name value =
+        ensureAttrAndSet xml.Dphdp3.Veta6.Value.XElement name value
+
+    let dateOfFill = input.DateOfFill.ToString("dd.MM.yyyy")
+
+    let total, totalVat =
+        input.Invoices
+        |> Seq.filter
+            (fun i ->
+                match input.Period with
+                | Quarter quarter -> i.AccountingPeriod.Year = quarter.Start.Year)
+        |> Seq.map (fun i -> (getQuarter i.AccountingPeriod), i)
+        |> Seq.filter
+            (fun (q, i) ->
+                i.AccountingPeriod >= q.Start
+                && i.AccountingPeriod < q.End)
+        |> Seq.map snd
+        |> Seq.fold (fun (tot,vat) i ->  tot + getTotal i , vat + getVatAmount i) (0,0)
+
+    validation {
+        let! _ = vetaDEnsureAndSet "d_poddp" dateOfFill
+        and! _ = veta1EnsureAndSet "obrat23" total
+        and! _ = veta1EnsureAndSet "dan23" totalVat
+        and! _ = veta6EnsureAndSet "dan_zocelk" totalVat
         and! _ =
             match input.Period with
             | Quarter quarter ->

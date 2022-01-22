@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Pisemnost nazevSW="EPO MF ČR" verzeSW="42.1.1">
+    <DPHDP3 verzePis="01.02">
+        <VetaD c_okec="620100" ctvrt="4" d_poddp="11.01.2022" dapdph_forma="B" dokument="DP3" k_uladis="DPH" kod_zo="Q"
+               rok="2021" trans="A" typ_platce="P"/>
+        <VetaP c_pop="555" c_telef="724792362" c_ufo="457" c_pracufo="2604" dic="8304072524" email="spingee@gmail.com"
+               jmeno="Jan" naz_obce="TANVALD" prijmeni="Strnad" psc="46841" stat="ČESKÁ REPUBLIKA" typ_ds="F"
+               ulice="Sportovní"/>
+        <Veta1 dan23="105840" obrat23="504000"/>
+<!--        <Veta4 odp_sum_kr="0" odp_sum_nar="900" odp_tuz23_nar="900" pln23="4287"/>-->
+<!--        <Veta5 odp_uprav_kf="0"/>-->
+        <Veta6 dan_zocelk="105840" dano="" dano_da="" dano_no="0" odp_zocelk=""/>
+    </DPHDP3>
+</Pisemnost>
