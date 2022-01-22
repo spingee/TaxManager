@@ -267,7 +267,7 @@ let view =
 
                                     Pagination.list [] [
                                         Pagination.Link.a [ Pagination.Link.Props [ OnClick
-                                                                                      (fun e -> dispatch <| Paginate(1)) ]
+                                                                                      (fun e -> dispatch <| Paginate(1))  ]
                                                             Pagination.Link.Current(1 = model.CurrentPage) ] [
                                             str (1l.ToString())
                                         ]
