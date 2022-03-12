@@ -96,7 +96,7 @@ let generateWorkBook (invoice:Invoice) =
         )
 
 
-    let dueDate = date.AddMonths(1).AddDays(3.0)
+    let dueDate = date.AddMonths(2).AddDays(3.0)
     let sumWithoutTax = int invoice.Rate * int invoice.ManDays
 
     let vat =
