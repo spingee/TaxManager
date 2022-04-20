@@ -200,6 +200,7 @@ let generateVatAnnouncementReport (input: VatInput) =
         (fun (q, i) ->
             i.AccountingPeriod >= q.Start
             && i.AccountingPeriod < q.End)
+    |> Seq.sortBy (fun (_, i) -> i.AccountingPeriod)
     |> Seq.map snd
     |> Seq.mapi (fun c i ->
                          let rowNumber = (c + 1) |> decimal |> Some
@@ -271,6 +272,7 @@ let generateVatReport (input: VatInput) =
             (fun (q, i) ->
                 i.AccountingPeriod >= q.Start
                 && i.AccountingPeriod < q.End)
+        |> Seq.sortBy (fun (_, i) -> i.AccountingPeriod)
         |> Seq.map snd
         |> Seq.fold (fun (tot,vat) i ->  tot + getTotal i , vat + getVatAmount i) (0,0)
 

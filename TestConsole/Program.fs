@@ -62,7 +62,6 @@ type Paint =
 
 [<EntryPoint>]
 let main argv =
-
     let att =
         File.ReadAllBytes("C:\Users\janst\OneDrive\Dokumenty\Faktury\danovy priznani 2017\penzijko.jpg")
 
@@ -80,6 +79,8 @@ let main argv =
                       AccountingPeriod = DateTime(2021, 12, 31)
                       ManDays = 22uy
                       Rate = 8000u
+                      InvoiceNumber = "sdad"
+                      DateOfTaxableSupply = DateTime(2021, 12, 31)
                       OrderNumber = None
                       Vat = Some 21uy
                       Customer =
