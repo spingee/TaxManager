@@ -143,7 +143,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
                             { Model = model.InvoiceModel
                               Dispatch = dispatch << InvoiceMsg }
                     ]
-                    Column.column [ Column.Width(Screen.All, Column.IsFourFifths) ] [
+                    Column.column [ Column.Width(Screen.All, Column.IsTwoThirds) ] [
                         Invoices.view
                             { Model = model.InvoicesModel
                               Dispatch = dispatch << InvoicesMsg }

@@ -22,11 +22,8 @@ open System.IO
 open MassTransit
 open System.Globalization
 open Giraffe
-open Auth
-open FSharp.Control.Tasks
-open Report
 open Service
-//open System.Linq
+
 
 let connectionString =
     @"FileName=./db/taxmanager.db;Connection=shared"

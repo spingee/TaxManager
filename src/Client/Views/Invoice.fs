@@ -428,7 +428,6 @@ let view =
                             str " Vat applicable"
                         ]
                     ]
-
                     Control.p [ Control.Props [ Style [ if (not model.VatApplicable) then
                                                             Visibility "hidden" ] ] ] [
                         Input.text [ match model.Vat.Parsed with
@@ -438,7 +437,7 @@ let view =
                                      Input.Value(model.Vat.Raw)
                                      Input.OnChange(fun x -> SetVat x.Value |> dispatch)
                                      Input.Placeholder "21"
-                                     Input.Props [ Size 1.0 ] ]
+                                     Input.Props [ Size 2.0 ] ]
 
                         match model.Vat.Parsed with
                         | Error []
