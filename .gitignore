@@ -18,3 +18,4 @@ release.sh
 /src/Server/db/*.db
 *.fs.js
 *.fs.js.map
+.DS_Store

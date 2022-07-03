@@ -50,6 +50,7 @@ let invoiceApi =
                       let coll = db.GetCollection<Dto.Invoice>("invoices")
 
                       let dateTaxSupply = getLastDayOfMonth invoiceReq.AccountingPeriod
+
                       let invoiceNumber, seqNumber = generateInvoiceNumber coll invoiceReq.AccountingPeriod
 
                       let invoice =
