@@ -6,7 +6,6 @@ open System.Globalization
 open GemBox.Spreadsheet
 open System.IO
 open System.Text.RegularExpressions
-open FsToolkit.ErrorHandling
 
 
 
@@ -171,5 +170,3 @@ let generateExcelData invoice =
     let stream = new MemoryStream()
     workbook.Save(stream, SaveOptions.XlsxDefault)
     stream
-
-

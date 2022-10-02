@@ -41,17 +41,13 @@ RUN dotnet fable src/Client -o src/Client/output -s --run npm run build
 RUN cd src/Server && dotnet publish -c release -o ../../deploy
 
 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0-alpine AS final
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS final
 #install font for document converter
-RUN apk --no-cache add msttcorefonts-installer fontconfig && \
-    update-ms-fonts && \
-    fc-cache -f && \
-    #timezone
-    apk add --no-cache tzdata && \
-    #.net globalization runtime
-    apk add --no-cache icu-libs &&\
-    #fixes some error with System.Drawing used by document converter
-    apk add libgdiplus --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --allow-untrusted
+RUN apt-get update \
+&& apt-get install -y --allow-unauthenticated libc6-dev \
+libgdiplus \
+libx11-dev \
+&& rm -rf /var/lib/apt/lists/*
 
 # Disable the invariant mode (set in base image)
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
