@@ -3,11 +3,13 @@ open System.IO
 open Report
 open FsToolkit.ErrorHandling
 open Shared
+open LiteDB
+open System.Collections
 
 let fff<'t> = System.Collections.Generic.List<'t>()
 
 let connectionString =
-    @"FileName=./db/taxmanager.db;Connection=shared"
+    @"FileName=/Users/janstrnad/OneDrive/Dokumenty/Faktury/TaxManagerDb/taxmanager.db;Connection=shared"
 
 
 type Paint =
@@ -24,47 +26,12 @@ type Paint =
 
 [<EntryPoint>]
 let main argv =
-    let att =
-        File.ReadAllBytes("C:\Users\janst\OneDrive\Dokumenty\Faktury\danovy priznani 2017\penzijko.jpg")
 
-
-    let vatIdResult =
-        (Invoice.createVatId "CZ56464")
-        |> Result.defaultValue (Invoice.VatId "XXX")
-
-    let lol2 =
-        generateVatAnnouncementReport
-            { Period = Quarter (Invoice.getQuarter DateTime.Now)
-              DateOfFill = DateTime.Now
-              Invoices =
-                  [ { Id = Guid.NewGuid()
-                      AccountingPeriod = DateTime(2021, 12, 31)
-                      ManDays = 22uy
-                      Rate = 8000u
-                      InvoiceNumber = "sdad"
-                      DateOfTaxableSupply = DateTime(2021, 12, 31)
-                      OrderNumber = None
-                      Vat = Some 21uy
-                      Customer =
-                          { IdNumber = 564654u
-                            VatId = vatIdResult
-                            Name = "lol"
-                            Address = "sadasd"
-                            Note = None } } ] }
-        |> Result.tee (fun x -> use x = x in use fileStream = new FileStream(@"C:\Users\janst\Desktop\test.xml", FileMode.Create) in x.CopyTo(fileStream))
-        |> Result.teeError Console.WriteLine
-
-    let lol =
-        generateAnnualTaxReport
-            { Year = 2021us
-              ExpensesType = Virtual 60uy
-              DateOfFill = DateTime.Now
-              TotalEarnings = 1600000u
-              PenzijkoAttachment = Some att }
-        |> Result.tee (fun x -> use x = x in use fileStream = new FileStream(@"C:\Users\janst\Desktop\test.xml", FileMode.Create) in x.CopyTo(fileStream))
-        |> Result.teeError Console.WriteLine
-
-
+    use db = new LiteDatabase(connectionString)
+    let coll = db.GetCollection<Dto.Invoice>("invoices")
+    let col = coll.FindAll() |> Seq.toArray
+    let inv =  coll.FindById("00020000-ac11-0242-229a-08dad46a49f7")
+    inv.
     //a.Add(1)
     Console.ReadLine() |> ignore
     0

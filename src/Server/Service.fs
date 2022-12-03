@@ -8,10 +8,7 @@ open FsToolkit.ErrorHandling
 open Shared.Invoice
 open Report
 
-type DownloadFile =
-    { FileName: string
-      ContentType: string
-      Stream: Stream }
+type DownloadFile = { FileName: string; ContentType: string; Stream: Stream }
 
 let generateInvoiceNumber (coll: ILiteCollection<Dto.Invoice>) (period: DateTime) =
     let y = period.Year
@@ -20,9 +17,7 @@ let generateInvoiceNumber (coll: ILiteCollection<Dto.Invoice>) (period: DateTime
     let invoicesOfPeriod =
         coll
             .Query()
-            .Where(fun f ->
-                f.AccountingPeriod.Year = y
-                && f.AccountingPeriod.Month = m)
+            .Where(fun f -> f.AccountingPeriod.Year = y && f.AccountingPeriod.Month = m)
             .ToArray()
 
     let rec getInvoiceNumber (invoices: Dto.Invoice seq) sequenceNumber =
@@ -31,10 +26,9 @@ let generateInvoiceNumber (coll: ILiteCollection<Dto.Invoice>) (period: DateTime
 
         let result =
             invoices
-            |> Seq.tryFind
-                (fun i ->
-                    (String.IsNullOrEmpty(i.InvoiceNumber) = false)
-                    && i.InvoiceNumber.Equals(invNumber, StringComparison.OrdinalIgnoreCase))
+            |> Seq.tryFind (fun i ->
+                (String.IsNullOrEmpty(i.InvoiceNumber) = false)
+                && i.InvoiceNumber.Equals(invNumber, StringComparison.OrdinalIgnoreCase))
 
         match result with
         | None -> invNumber, sequenceNumber
@@ -46,33 +40,48 @@ let generateInvoiceNumber (coll: ILiteCollection<Dto.Invoice>) (period: DateTime
 let getInvoiceFileName (period: DateTime) index =
     sprintf "Faktura - %i-%02i-%02i" period.Year period.Month index
 
-let getTotal (connectionString: string) year =
-    use db = new LiteDatabase(connectionString)
-
+let getTotal (coll: ILiteCollection<Dto.Invoice>) year =
     let s = DateTime(year, 1, 1)
     let e = s.AddYears(1)
 
-    db
-        .GetCollection<Dto.Invoice>("invoices")
+    coll
         .Query()
         .Where(fun i -> i.AccountingPeriod >= s && i.AccountingPeriod < e)
         .ToArray()
-    |> Array.sumBy
-        (fun a ->
+    |> Array.sumBy (fun a ->
+        let total = a.Rate * uint32 a.ManDays
+        total)
+
+let getQuarterTotals (coll: ILiteCollection<Dto.Invoice>) quarterStart quarterEnd =
+    let invs =
+        coll
+            .Query()
+            .Where(fun i -> i.AccountingPeriod >= quarterStart && i.AccountingPeriod < quarterEnd)
+            .ToArray()
+
+    let Quarter =
+        invs |> Array.sumBy (fun a -> a.Rate * uint32 a.ManDays)
+
+    let QuarterVat =
+        invs
+        |> Array.sumBy (fun a ->
             let total = a.Rate * uint32 a.ManDays
-            total)
+
+            match Option.ofNullable a.Vat with
+            | None -> total
+            | Some v -> (total / uint32 100 * uint32 v))
+
+    {| Quarter = Quarter; QuarterVat = QuarterVat |}
 
 let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
     use db = new LiteDatabase(connectionString)
 
-    let invoices =
-        db.GetCollection<Dto.Invoice>("invoices")
+    let invoices = db.GetCollection<Dto.Invoice>("invoices")
 
     let invoiceDto = invoices.FindById(BsonValue(invoiceId))
 
     let invoice =
-        Dto.fromInvoiceDto invoiceDto
-        |> Result.valueOr failwith
+        Dto.fromInvoiceDto invoiceDto |> Result.valueOr failwith
 
     let fileName = invoice.InvoiceNumber
 
@@ -84,17 +93,15 @@ let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
       Stream = stream }
 
 
-let generateSummaryReport (connectionString: string) (reportType: SummaryReportType) =
-
+let generateSummaryReport (coll: ILiteCollection<Dto.Invoice>) (reportType: SummaryReportType) =
     let getVatInput =
         let quarter = getPreviousQuarter DateTime.Now
-        use db = new LiteDatabase(connectionString)
+
         let year = quarter.Start.Year
         let startMonth = quarter.Start.Month
         let endMonth = quarter.End.AddMonths(-1).Month
 
-        db
-            .GetCollection<Dto.Invoice>("invoices")
+        coll
             .Query()
             .Where(fun f ->
                 f.AccountingPeriod.Year = year
@@ -103,11 +110,10 @@ let generateSummaryReport (connectionString: string) (reportType: SummaryReportT
             .ToArray()
         |> List.ofSeq
         |> List.traverseResultA Dto.fromInvoiceDto
-        |> Result.map
-            (fun is ->
-                { Period = Quarter quarter
-                  DateOfFill = DateTime.Now
-                  Invoices = is })
+        |> Result.map (fun is ->
+            { Period = Quarter quarter
+              DateOfFill = DateTime.Now
+              Invoices = is })
 
     match reportType with
     | AnnualTax ->
@@ -117,33 +123,22 @@ let generateSummaryReport (connectionString: string) (reportType: SummaryReportT
             { Year = year |> uint16
               ExpensesType = Virtual 60uy
               DateOfFill = DateTime.Now
-              TotalEarnings = getTotal connectionString year
+              TotalEarnings = getTotal coll year
               PenzijkoAttachment = None }
-    | QuartalVatAnnounce ->
-        getVatInput
-        |> Result.bind generateVatAnnouncementReport
-    | QuartalVat ->
-        getVatInput
-        |> Result.bind generateVatReport
-
-
-
-
+    | QuartalVatAnnounce -> getVatInput |> Result.bind generateVatAnnouncementReport
+    | QuartalVat -> getVatInput |> Result.bind generateVatReport
     | _ -> failwith $"Not implemented {reportType}"
 
 
-let generateSummaryReportFile (connectionString: string) (reportType: SummaryReportType) =
+let generateSummaryReportFile (coll: ILiteCollection<Dto.Invoice>) (reportType: SummaryReportType) =
+    generateSummaryReport coll reportType
+    |> Result.map (fun s ->
+        let fileName =
+            match reportType with
+            | AnnualTax -> "dpfdp5_epo2.xml"
+            | QuartalVatAnnounce -> "dphkh1_epo2.xml"
+            | _ -> failwith $"Not implemented {reportType}"
 
-
-    generateSummaryReport connectionString reportType
-    |> Result.map
-        (fun s ->
-            let fileName =
-                match reportType with
-                | AnnualTax -> "dpfdp5_epo2.xml"
-                | QuartalVatAnnounce -> "dphkh1_epo2.xml"
-                | _ -> failwith $"Not implemented {reportType}"
-
-            { FileName = fileName
-              ContentType = "application/xml"
-              Stream = s })
+        { FileName = fileName
+          ContentType = "application/xml"
+          Stream = s })

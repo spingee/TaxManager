@@ -1,7 +1,6 @@
 namespace Shared
 
 open System
-open System.Globalization
 open System.Text.RegularExpressions
 
 
@@ -71,17 +70,27 @@ module Invoice =
           Vat: uint8 option
           Customer: Customer }
 
-    type TotalPrice = { Value: decimal; Currency: string; TimeRange: string }
+    type TotalPrice =
+        { Value: decimal
+          Currency: string
+          TimeRange: string }
+        static member Default = { Value = 0m; Currency = "CZK"; TimeRange = "" }
 
     type Totals =
         { LastYear: TotalPrice
           LastQuarter: TotalPrice
-          LastQuarterVat: TotalPrice }
+          LastQuarterVat: TotalPrice
+          CurrentYear: TotalPrice
+          CurrentQuarter: TotalPrice
+          CurrentQuarterVat: TotalPrice }
 
     let TotalsDefault =
-        { LastYear = { Value = 0m; Currency = "CZK"; TimeRange = "" }
-          LastQuarter = { Value = 0m; Currency = "CZK"; TimeRange = "" }
-          LastQuarterVat = { Value = 0m; Currency = "CZK"; TimeRange = "" } }
+        { LastYear = TotalPrice.Default
+          LastQuarter = TotalPrice.Default
+          LastQuarterVat = TotalPrice.Default
+          CurrentYear = TotalPrice.Default
+          CurrentQuarter = TotalPrice.Default
+          CurrentQuarterVat = TotalPrice.Default }
 
 
     let getTotal i = (int i.ManDays) * (int i.Rate)
@@ -100,9 +109,7 @@ module Invoice =
         |> Option.defaultValue total
 
     let getLastDayOfMonth (accPeriod: DateTime) =
-        DateTime(int accPeriod.Year, int accPeriod.Month, 1)
-            .AddMonths(1)
-            .AddDays(-1)
+        DateTime(int accPeriod.Year, int accPeriod.Month, 1).AddMonths(1).AddDays(-1)
 
 
 

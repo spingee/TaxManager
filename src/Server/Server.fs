@@ -43,311 +43,287 @@ do SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
 
 let invoiceApi =
     { addInvoice =
-          fun invoiceReq ->
-              async {
-                  try
-                      use db = new LiteDatabase(connectionString)
-                      let coll = db.GetCollection<Dto.Invoice>("invoices")
+        fun invoiceReq ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
-                      let dateTaxSupply = getLastDayOfMonth invoiceReq.AccountingPeriod
+                    let dateTaxSupply =
+                        getLastDayOfMonth invoiceReq.AccountingPeriod
 
-                      let invoiceNumber, seqNumber = generateInvoiceNumber coll invoiceReq.AccountingPeriod
+                    let invoiceNumber, seqNumber =
+                        generateInvoiceNumber coll invoiceReq.AccountingPeriod
 
-                      let invoice =
-                          { Id = NewId.NextGuid()
-                            InvoiceNumber = invoiceNumber
-                            ManDays = invoiceReq.ManDays
-                            Rate = invoiceReq.Rate
-                            AccountingPeriod = invoiceReq.AccountingPeriod
-                            DateOfTaxableSupply = dateTaxSupply
-                            OrderNumber = invoiceReq.OrderNumber
-                            Vat = invoiceReq.Vat
-                            Customer = invoiceReq.Customer }
+                    let invoice =
+                        { Id = NewId.NextGuid()
+                          InvoiceNumber = invoiceNumber
+                          ManDays = invoiceReq.ManDays
+                          Rate = invoiceReq.Rate
+                          AccountingPeriod = invoiceReq.AccountingPeriod
+                          DateOfTaxableSupply = dateTaxSupply
+                          OrderNumber = invoiceReq.OrderNumber
+                          Vat = invoiceReq.Vat
+                          Customer = invoiceReq.Customer }
 
-                      invoice |> Dto.toInvoiceDto DateTime.Now |> coll.Insert |> ignore
+                    invoice |> Dto.toInvoiceDto DateTime.Now |> coll.Insert |> ignore
 
-                      let outputFile =
-                          Path.Combine(
-                              documentOutputDir,
-                              getInvoiceFileName invoiceReq.AccountingPeriod seqNumber
-                          )
+                    let outputFile =
+                        Path.Combine(documentOutputDir, getInvoiceFileName invoiceReq.AccountingPeriod seqNumber)
 
-                      createExcelAndPdfInvoice outputFile invoice
+                    createExcelAndPdfInvoice outputFile invoice
 
-                      return Ok invoice
-                  with
-                  | ex -> return Error <| sprintf "%s" ex.Message
-              }
+                    return Ok invoice
+                with ex ->
+                    return Error <| sprintf "%s" ex.Message
+            }
       getCustomers =
-          fun () ->
-              async {
-                  try
-                      use db = new LiteDatabase(connectionString)
+        fun () ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
 
-                      let invoices =
-                          db.GetCollection<Dto.Invoice>("invoices")
-                      //let customers = invoices.FindAll().Select(fun f->f.Customer)
-                      // BsonExpression.Create("group by") // todo
-                      //   let lol = BsonMapper.Global.GetExpression(fun i -> i.Customer)
-                      //   let troll = invoices.Query().GroupBy(lol).Select(lol).ToArray();
-                      return
-                          invoices
-                              .Query()
-                              .OrderByDescending(fun i -> i.Inserted)
-                              .Select(fun i -> i.Customer)
-                              .ToArray()
-                          |> List.ofSeq
-                          |> List.groupBy id
-                          |> List.map fst
-                          |> List.traverseResultA Dto.fromCustomerDto
-                          |> Result.mapError (fun e -> String.concat ", " e)
+                    let invoices = db.GetCollection<Dto.Invoice>("invoices")
+                    //let customers = invoices.FindAll().Select(fun f->f.Customer)
+                    // BsonExpression.Create("group by") // todo
+                    //   let lol = BsonMapper.Global.GetExpression(fun i -> i.Customer)
+                    //   let troll = invoices.Query().GroupBy(lol).Select(lol).ToArray();
+                    return
+                        invoices
+                            .Query()
+                            .OrderByDescending(fun i -> i.Inserted)
+                            .Select(fun i -> i.Customer)
+                            .ToArray()
+                        |> List.ofSeq
+                        |> List.groupBy id
+                        |> List.map fst
+                        |> List.traverseResultA Dto.fromCustomerDto
+                        |> Result.mapError (fun e -> String.concat ", " e)
 
-                  with
-                  | e -> return Error e.Message
-              }
+                with e ->
+                    return Error e.Message
+            }
       getInvoices =
-          fun pageNumber pageSize ->
-              async {
-                  try
-                      use db = new LiteDatabase(connectionString)
+        fun pageNumber pageSize ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
 
-                      let total =
-                          db
-                              .GetCollection<Dto.Invoice>("invoices")
-                              .Query()
-                              .Count()
+                    let total =
+                        db.GetCollection<Dto.Invoice>("invoices").Query().Count()
 
-                      return
-                          (db
-                              .GetCollection<Dto.Invoice>("invoices")
-                               .Query()
-                               //jeste bych rad pro jistotu sortoval podle, inserted ale multi column sort prej az litedb 5.1
-                               //kazdopadne guid id je sequencni tak snad je to serazeny podle primary indexu tak jak chci
-                               .OrderByDescending(fun x -> x.AccountingPeriod)
-                               .Offset(pageSize * (pageNumber - 1))
-                               .Limit(pageSize)
-                               .ToArray()
-                           |> List.ofSeq
-                           |> List.traverseResultM Dto.fromInvoiceDto)
-                          |> Result.map (fun x -> x, total)
-                  with
-                  | e -> return Error e.Message
-              }
+                    return
+                        (db
+                            .GetCollection<Dto.Invoice>("invoices")
+                             .Query()
+                             //jeste bych rad pro jistotu sortoval podle, inserted ale multi column sort prej az litedb 5.1
+                             //kazdopadne guid id je sequencni tak snad je to serazeny podle primary indexu tak jak chci
+                             .OrderByDescending(fun x -> x.AccountingPeriod)
+                             .Offset(pageSize * (pageNumber - 1))
+                             .Limit(pageSize)
+                             .ToArray()
+                         |> List.ofSeq
+                         |> List.traverseResultM Dto.fromInvoiceDto)
+                        |> Result.map (fun x -> x, total)
+                with e ->
+                    return Error e.Message
+            }
       getInvoiceDefaults =
-          fun () ->
-              async {
-                  try
-                      let lastMonth =
-                          DateTime.Now.AddMonths(-1)
+        fun () ->
+            async {
+                try
+                    let lastMonth = DateTime.Now.AddMonths(-1)
 
-                      let mandays =
-                          [ 1 .. DateTime.DaysInMonth(lastMonth.Year, lastMonth.Month) ]
-                          |> List.filter
-                              (fun d ->
-                                  not (
-                                      [ DayOfWeek.Saturday; DayOfWeek.Sunday ]
-                                      |> List.contains (
-                                          DateOnly(
-                                              lastMonth.Year,
-                                              lastMonth.Month,
-                                              d
-                                          )
-                                              .DayOfWeek
-                                      )
-                                  ))
-                          |> List.length
-                          |> uint8
+                    let mandays =
+                        [ 1 .. DateTime.DaysInMonth(lastMonth.Year, lastMonth.Month) ]
+                        |> List.filter (fun d ->
+                            not (
+                                [ DayOfWeek.Saturday; DayOfWeek.Sunday ]
+                                |> List.contains (DateOnly(lastMonth.Year, lastMonth.Month, d).DayOfWeek)
+                            ))
+                        |> List.length
+                        |> uint8
 
 
-                      use db = new LiteDatabase(connectionString)
+                    use db = new LiteDatabase(connectionString)
 
-                      let coll =
-                          db.GetCollection<Dto.Invoice>("invoices")
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
-                      let invoiceNumber, _ = generateInvoiceNumber coll lastMonth
+                    let invoiceNumber, _ = generateInvoiceNumber coll lastMonth
 
-                      let dateOfTaxSupply = getLastDayOfMonth lastMonth
+                    let dateOfTaxSupply = getLastDayOfMonth lastMonth
 
 
-                      return
-                          (coll
-                              .Query()
-                               .OrderByDescending(fun x -> x.AccountingPeriod)
-                               .FirstOrDefault() //
-                           |> (fun x ->
-                               if ((box x) = null) then
-                                   None
-                               else
-                                   Some x)
-                           |> Option.map
-                               (fun x ->
-                                   { x with
-                                         ManDays = mandays
-                                         AccountingPeriod = lastMonth
-                                         InvoiceNumber = invoiceNumber
-                                         DateOfTaxableSupply = dateOfTaxSupply }
-                                   |> Dto.fromInvoiceDto)
+                    return
+                        (coll.Query().OrderByDescending(fun x -> x.AccountingPeriod).FirstOrDefault() //
+                         |> (fun x -> if ((box x) = null) then None else Some x)
+                         |> Option.map (fun x ->
+                             { x with
+                                 ManDays = mandays
+                                 AccountingPeriod = lastMonth
+                                 InvoiceNumber = invoiceNumber
+                                 DateOfTaxableSupply = dateOfTaxSupply }
+                             |> Dto.fromInvoiceDto)
 
-                           |> Option.defaultValue (
-                               Ok
-                                   { Invoice.Id = Guid.Empty
-                                     Rate = 6000u
-                                     OrderNumber = None
-                                     Vat = Some 21uy
-                                     Customer =
-                                         { IdNumber = 0u
-                                           VatId = VatId "CZ0000"
-                                           Name = "Some customer"
-                                           Address = ""
-                                           Note = None }
-                                     ManDays = mandays
-                                     AccountingPeriod = lastMonth
-                                     InvoiceNumber = invoiceNumber
-                                     DateOfTaxableSupply = getLastDayOfMonth lastMonth }
-                           )
-                          )
+                         |> Option.defaultValue (
+                             Ok
+                                 { Invoice.Id = Guid.Empty
+                                   Rate = 6000u
+                                   OrderNumber = None
+                                   Vat = Some 21uy
+                                   Customer =
+                                     { IdNumber = 0u
+                                       VatId = VatId "CZ0000"
+                                       Name = "Some customer"
+                                       Address = ""
+                                       Note = None }
+                                   ManDays = mandays
+                                   AccountingPeriod = lastMonth
+                                   InvoiceNumber = invoiceNumber
+                                   DateOfTaxableSupply = getLastDayOfMonth lastMonth }
+                         ))
 
-                  with
-                  | e -> return Error e.Message
-              }
+                with e ->
+                    return Error e.Message
+            }
       removeInvoice =
-          fun id ->
-              async {
-                  try
-                      use db = new LiteDatabase(connectionString)
+        fun id ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
 
-                      let isDeleted =
-                          db
-                              .GetCollection<Dto.Invoice>("invoices")
-                              .Delete(BsonValue(id))
+                    let isDeleted =
+                        db.GetCollection<Dto.Invoice>("invoices").Delete(BsonValue(id))
 
-                      if (isDeleted) then
-                          return Ok()
-                      else
-                          return
-                              Error
-                              <| sprintf "Invoice with id %A was not removed." id
-                  with
-                  | e -> return Error e.Message
-              }
+                    if (isDeleted) then
+                        return Ok()
+                    else
+                        return Error <| sprintf "Invoice with id %A was not removed." id
+                with e ->
+                    return Error e.Message
+            }
       searchOrderNumber =
-          fun s ->
-              async {
-                  try
-                      use db = new LiteDatabase(connectionString)
+        fun s ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
 
-                      return
-                          db
-                              .GetCollection<Dto.Invoice>("invoices")
-                              .Query()
-                              .Where(fun i -> i.OrderNumber.StartsWith(s))
-                              .Select(fun i -> i.OrderNumber)
-                              .ToList()
-                          |> List.ofSeq
-                          |> List.distinct
-                          |> List.sortByDescending id
-                          |> Ok
-                  with
-                  | e -> return Error e.Message
-              }
+                    return
+                        db
+                            .GetCollection<Dto.Invoice>("invoices")
+                            .Query()
+                            .Where(fun i -> i.OrderNumber.StartsWith(s))
+                            .Select(fun i -> i.OrderNumber)
+                            .ToList()
+                        |> List.ofSeq
+                        |> List.distinct
+                        |> List.sortByDescending id
+                        |> Ok
+                with e ->
+                    return Error e.Message
+            }
       getTotals =
-          fun s ->
-              async {
-                  try
-                      use db = new LiteDatabase(connectionString)
-                      let y = DateTime.Now.AddYears(-1)
+        fun () ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
-                      let lastYear = getTotal connectionString y.Year
+                    let lastYear = DateTime.Now.AddYears(-1).Year
+                    let currentYear = DateTime.Now.Year
 
-                      let { Start = quarterStart
-                            End = quarterEnd
-                            Number = quarter } =
-                          getPreviousQuarter DateTime.Now
+                    let lastYearTotal = getTotal coll lastYear
+                    let currentYearTotal = getTotal coll currentYear
 
-                      let lastQuarterBase =
-                          db
-                              .GetCollection<Dto.Invoice>("invoices")
-                              .Query()
-                              .Where(fun i ->
-                                  i.AccountingPeriod >= quarterStart
-                                  && i.AccountingPeriod < quarterEnd)
-                              .ToArray()
+                    let { Start = lastQuarterStart
+                          End = lastQuarterEnd
+                          Number = lastQuarterNumber } =
+                        getPreviousQuarter DateTime.Now
 
-                      let lastQuarter =
-                          lastQuarterBase
-                          |> Array.sumBy (fun a -> a.Rate * uint32 a.ManDays)
+                    let { Start = currentQuarterStart
+                          End = currentQuarterEnd
+                          Number = currentQuarterNumber } =
+                        getQuarter DateTime.Now
 
-                      let lastQuarterVat =
-                          lastQuarterBase
-                          |> Array.sumBy
-                              (fun a ->
-                                  let total = a.Rate * uint32 a.ManDays
 
-                                  match Option.ofNullable a.Vat with
-                                  | None -> total
-                                  | Some v -> (total / uint32 100 * uint32 v))
 
-                      return
-                          { LastYear =
-                                { Value = decimal lastYear
-                                  Currency = "CZK"
-                                  TimeRange = y.Year.ToString() }
-                            LastQuarter =
-                                { Value = decimal lastQuarter
-                                  Currency = "CZK"
-                                  TimeRange = $"Q{quarter}" }
-                            LastQuarterVat =
-                                { Value = decimal lastQuarterVat
-                                  Currency = "CZK"
-                                  TimeRange = $"Q{quarter}" } }
-                          |> Ok
-                  with
-                  | e -> return Error e.Message
-              }
+                    let lastQuarter =
+                        getQuarterTotals coll lastQuarterStart lastQuarterEnd
+
+                    let currentQuarter =
+                        getQuarterTotals coll currentQuarterStart currentQuarterEnd
+
+
+                    return
+                        { LastYear =
+                            { Value = decimal lastYearTotal
+                              Currency = "CZK"
+                              TimeRange = lastYear.ToString() }
+                          LastQuarter =
+                            { Value = decimal lastQuarter.Quarter
+                              Currency = "CZK"
+                              TimeRange = $"Q{lastQuarterNumber}" }
+                          LastQuarterVat =
+                            { Value = decimal lastQuarter.QuarterVat
+                              Currency = "CZK"
+                              TimeRange = $"Q{lastQuarterNumber}" }
+                          CurrentYear =
+                            { Value = decimal currentYearTotal
+                              Currency = "CZK"
+                              TimeRange = currentYear.ToString() }
+                          CurrentQuarter =
+                            { Value = decimal currentQuarter.Quarter
+                              Currency = "CZK"
+                              TimeRange = $"Q{currentQuarterNumber}" }
+                          CurrentQuarterVat =
+                            { Value = decimal currentQuarter.QuarterVat
+                              Currency = "CZK"
+                              TimeRange = $"Q{currentQuarterNumber}" } }
+                        |> Ok
+                with e ->
+                    return Error e.Message
+            }
       prepareSummaryReportUrl =
-          fun type' ->
-              async {
-                  try
-                      let stream =
-                          generateSummaryReport connectionString type'
+        fun type' ->
+            async {
+                try
+                    use db = new LiteDatabase(connectionString)
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
+                    let stream = generateSummaryReport coll type'
 
-                      match stream with
-                      | Error errs -> return Error(errs |> String.concat Environment.NewLine)
-                      | Ok stream ->
+                    match stream with
+                    | Error errs -> return Error(errs |> String.concat Environment.NewLine)
+                    | Ok stream ->
 
-                          use stream = stream
-                          do stream.Position <- 0L
+                        use stream = stream
+                        do stream.Position <- 0L
 
-                          use content = new StreamContent(stream)
-                          content.Headers.Add("Content-Type", "application/xml")
-                          let httpClientHandler = new HttpClientHandler()
-                          use httpClient = new HttpClient(httpClientHandler)
+                        use content = new StreamContent(stream)
+                        content.Headers.Add("Content-Type", "application/xml")
+                        let httpClientHandler = new HttpClientHandler()
+                        use httpClient = new HttpClient(httpClientHandler)
 
 
-                          let url =
-                              "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
+                        let url =
+                            "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
 
-                          use requestMessage =
-                              new HttpRequestMessage(HttpMethod.Post, url)
+                        use requestMessage =
+                            new HttpRequestMessage(HttpMethod.Post, url)
 
-                          requestMessage.Content <- content
+                        requestMessage.Content <- content
 
-                          use! response =
-                              httpClient.PostAsync(url, content)
-                              |> Async.AwaitTask
+                        use! response = httpClient.PostAsync(url, content) |> Async.AwaitTask
 
-                          let! body =
-                              response.Content.ReadAsStringAsync()
-                              |> Async.AwaitTask
+                        let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
 
-                          if (not response.IsSuccessStatusCode) then
-                              return Error $"Remote api error {body}"
-                          else
-                              let url = (XDocument.Parse body).Root.Value
-                              return Ok url
-                  with
-                  | e -> return Error(e.Message + e.StackTrace)
-              } }
+                        if (not response.IsSuccessStatusCode) then
+                            return Error $"Remote api error {body}"
+                        else
+                            let url = (XDocument.Parse body).Root.Value
+                            return Ok url
+                with e ->
+                    return Error(e.Message + e.StackTrace)
+            } }
 
 let downloadHandler file : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -361,18 +337,17 @@ let downloadHandler file : HttpHandler =
 
 
 let summaryReportHandler =
+    use db = new LiteDatabase(connectionString)
+    let coll = db.GetCollection<Dto.Invoice>("invoices")
+
     SummaryReportType.fromString
-    >> generateSummaryReportFile connectionString
+    >> generateSummaryReportFile coll
     >> Result.map downloadHandler
     >> Result.valueOr (fun e -> setStatusCode 500 >=> text (String.concat "\n" e))
 
-let errorHandler (ex: Exception)
-                 (routeInfo: RouteInfo<HttpContext>) =
-
+let errorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) =
     let contextLogger = routeInfo.httpContext.GetLogger()
-
-    let errorMsgTemplate = "Error occured while invoking {MethodName} at {RoutePath}"
-    contextLogger.Log(LogLevel.Error,ex.Message)
+    contextLogger.Log(LogLevel.Error, ex.Message)
     Ignore
 
 
@@ -384,16 +359,12 @@ let webApp =
     |> Remoting.buildHttpHandler
 
 let router =
-    choose [ GET
-             >=> routef
-                     "/api/generateInvoiceDocument/%O"
-                     (generateInvoiceExcel connectionString
-                      >> downloadHandler)
-             GET
-             >=> routef "/api/generateSummaryReport/%s" summaryReportHandler
-             routeStartsWith "/api" >=> webApp
-             setStatusCode 404 >=> text "Not found" ]
-
+    choose
+        [ GET
+          >=> routef "/api/generateInvoiceDocument/%O" (generateInvoiceExcel connectionString >> downloadHandler)
+          GET >=> routef "/api/generateSummaryReport/%s" summaryReportHandler
+          routeStartsWith "/api" >=> webApp
+          setStatusCode 404 >=> text "Not found" ]
 
 
 let app =
