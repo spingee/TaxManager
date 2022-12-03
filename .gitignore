@@ -8,7 +8,7 @@ deploy/
 obj/
 bin/
 packages/
-/output/
+output/
 paket-files/
 node_modules/
 release.cmd
@@ -19,3 +19,5 @@ release.sh
 *.fs.js
 *.fs.js.map
 .DS_Store
+src/.DS_Store
+src/Server/.DS_Store

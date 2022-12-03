@@ -1,11 +1,7 @@
-// Template for webpack.config.js in Fable projects
-// Find latest version in https://github.com/fable-compiler/webpack-config-template
-
-// In most cases, you'll only need to edit the CONFIG object (after dependencies)
-// See below if you need better fine-tuning of Webpack options
-
-// Dependencies. Also required: core-js, fable-loader, fable-compiler, @babel/core,
-// @babel/preset-env, babel-loader, sass, sass-loader, css-loader, style-loader, file-loader, resolve-url-loader
+// In most cases, you'll only need to edit the CONFIG/TEST_CONFIG objects
+// CONFIG is the configuration used to run the application.
+// TEST_CONFIG is the configuration used to run tests.
+// If you need better fine-tuning of Webpack options check the buildConfig function.
 var path = require('path');
 var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');

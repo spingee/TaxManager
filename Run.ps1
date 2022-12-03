@@ -9,7 +9,7 @@ dotnet build
 
 Set-Location ../Client
 
-Start-Process -NoNewWindow -FilePath dotnet -ArgumentList "fable watch -o output -s --run webpack-dev-server --open --config ../../webpack.config.js"
+Start-Process -NoNewWindow -FilePath dotnet -ArgumentList "fable watch -o output -s --run webpack-dev-server --mode development --open --config ../../webpack.config.js"
 
 
 Pop-Location
