@@ -6,4 +6,4 @@ Written in fullstack F# based on SAFE-Stack template
 run **dotnet tool install**
 run **CreateDockerImage.ps1**
 
-```docker run --name=taxmanager -v {path to dir with db file}:/app/db -v {path where to publish generated invoice documents}:/app/output  -p 8086:8085 -d spingee/taxmanager```
+```docker run --name=taxmanager -v {path to dir with db file}:/app/db -v {path where to publish generated invoice documents}:/app/output  -p 8086:80 -d spingee/taxmanager```
