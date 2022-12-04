@@ -15,9 +15,8 @@ release.cmd
 release.sh
 *.orig
 *.DotSettings.user
+*.fsproj.user
 /src/Server/db/*.db
 *.fs.js
 *.fs.js.map
 .DS_Store
-src/.DS_Store
-src/Server/.DS_Store
