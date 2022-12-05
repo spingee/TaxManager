@@ -96,7 +96,7 @@ let generateWorkBook (invoice:Invoice) =
 
 
     let dueDate = date.AddMonths(2).AddDays(3.0)
-    let sumWithoutTax = int invoice.Rate * int invoice.ManDays
+    let sumWithoutTax = getTotal invoice
 
     let vat =
         match invoice.Vat with
@@ -123,12 +123,21 @@ let generateWorkBook (invoice:Invoice) =
                                   invoice.AccountingPeriod.Month
                                   invoice.AccountingPeriod.Year
 
-    ws.Cells.["A23"].Value <- sprintf "Počet MD: %i" invoice.ManDays
-    ws.Cells.["A24"].Value <- sprintf "Sazba MD: %iKč" invoice.Rate
+    //temporary pick just first ManDay item
+    let manDay =
+        invoice.Items
+        |> Seq.choose (function | ManDay(rate, manDays) -> Some (rate, manDays) | _ -> None)
+        |> Seq.tryHead
+        |> Option.iter (fun (rate, manDays) ->
+                 ws.Cells.["A23"].Value <- sprintf "Počet MD: %i" manDays
+                 ws.Cells.["A24"].Value <- sprintf "Sazba MD: %iKč" rate
+            )
+
+
 
     match invoice.Vat with
     | Some v ->
-        ws.Cells.["D25"].Value <- sprintf "%i,-Kč" sumWithoutTax
+        ws.Cells.["D25"].Value <- sprintf "%f,-Kč" sumWithoutTax
         ws.Cells.["D26"].Value <- sprintf "%.0f,-Kč" vat
         ws.Cells.["C26"].Value <- sprintf "DPH %i%%" <| v
         ws.Cells.["A44"].Value <- "Poznámka: Dodavatel JE plátcem DPH."

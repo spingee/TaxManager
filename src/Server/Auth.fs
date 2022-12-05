@@ -9,7 +9,7 @@ open Saturn
 
 type Saturn.Application.ApplicationBuilder with
     [<CustomOperation("use_client_certificate")>]
-    member __.UseClientCertificate(state: ApplicationState) =
+    member _.UseClientCertificate(state: ApplicationState) =
         let middleware (app: IApplicationBuilder) = app.UseAuthentication()
 
         let service (s: IServiceCollection) =

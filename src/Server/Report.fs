@@ -5,7 +5,6 @@ open System.IO
 open FSharp.Data
 open System.Xml.Linq
 open FsToolkit.ErrorHandling
-open Shared
 open Shared.Invoice
 
 type AnnualTaxReport =
@@ -28,7 +27,7 @@ type AnnualTaxReportInput =
     { Year: uint16
       ExpensesType: ExpensesType
       DateOfFill: DateTime
-      TotalEarnings: uint32
+      TotalEarnings: decimal
       PenzijkoAttachment: byte [] option }
 
 let inline ensureAttrAndSet (xElem: XElement) name value =
@@ -129,8 +128,8 @@ let generateAnnualTaxReport input =
     let expenses =
         input.ExpensesType
         |> function
-            | Virtual v -> (input.TotalEarnings / 100u) * (v |> uint32)
-            | Real v -> v
+            | Virtual v -> (input.TotalEarnings / 100M) * (v |> decimal)
+            | Real v -> v |> decimal
 
     validation {
         let! _ = vetaDEnsureAndSet "rok" input.Year
@@ -274,7 +273,7 @@ let generateVatReport (input: VatInput) =
                 && i.AccountingPeriod < q.End)
         |> Seq.sortBy (fun (_, i) -> i.AccountingPeriod)
         |> Seq.map snd
-        |> Seq.fold (fun (tot,vat) i ->  tot + getTotal i , vat + getVatAmount i) (0,0)
+        |> Seq.fold (fun (tot,vat) i ->  tot + getTotal i , vat + getVatAmount i) (0M,0M)
 
     validation {
         let! _ = vetaDEnsureAndSet "d_poddp" dateOfFill

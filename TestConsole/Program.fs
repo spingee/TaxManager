@@ -21,7 +21,26 @@ type Paint =
 
     member me.Pigment =
         let (Paint' (pigment = value)) = me in value
+[<CLIMutable>]
+type Customer =
+    { IdNumber: uint
+      VatId: string
+      Name: string
+      Address: string
+      Note: string }
 
+[<CLIMutable>]
+type Invoice =
+    { Id: Guid
+      InvoiceNumber: string
+      ManDays: uint8
+      Rate: uint32
+      AccountingPeriod: DateTime
+      DateOfTaxableSupply: DateTime
+      OrderNumber: string
+      Vat: Nullable<int>
+      Customer: Customer
+      Inserted: DateTime }
 
 
 [<EntryPoint>]

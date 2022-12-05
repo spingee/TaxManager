@@ -47,7 +47,7 @@ let invoiceApi =
             async {
                 try
                     use db = new LiteDatabase(connectionString)
-                    let coll = db.GetCollection<Dto.Invoice>("invoices")
+                    let coll = db.GetCollection<Invoice>("invoices")
 
                     let dateTaxSupply =
                         getLastDayOfMonth invoiceReq.AccountingPeriod
@@ -58,15 +58,15 @@ let invoiceApi =
                     let invoice =
                         { Id = NewId.NextGuid()
                           InvoiceNumber = invoiceNumber
-                          ManDays = invoiceReq.ManDays
-                          Rate = invoiceReq.Rate
+                          Items = [ ManDay(invoiceReq.Rate, invoiceReq.ManDays) ]
                           AccountingPeriod = invoiceReq.AccountingPeriod
                           DateOfTaxableSupply = dateTaxSupply
                           OrderNumber = invoiceReq.OrderNumber
                           Vat = invoiceReq.Vat
-                          Customer = invoiceReq.Customer }
+                          Customer = invoiceReq.Customer
+                          Created = DateTime.Now }
 
-                    invoice |> Dto.toInvoiceDto DateTime.Now |> coll.Insert |> ignore
+                    invoice |> coll.Insert |> ignore
 
                     let outputFile =
                         Path.Combine(documentOutputDir, getInvoiceFileName invoiceReq.AccountingPeriod seqNumber)
@@ -134,7 +134,7 @@ let invoiceApi =
                 try
                     let lastMonth = DateTime.Now.AddMonths(-1)
 
-                    let mandays =
+                    let manDays =
                         [ 1 .. DateTime.DaysInMonth(lastMonth.Year, lastMonth.Month) ]
                         |> List.filter (fun d ->
                             not (
@@ -147,41 +147,36 @@ let invoiceApi =
 
                     use db = new LiteDatabase(connectionString)
 
-                    let coll = db.GetCollection<Dto.Invoice>("invoices")
+                    let coll = db.GetCollection<Invoice>("invoices")
 
                     let invoiceNumber, _ = generateInvoiceNumber coll lastMonth
 
                     let dateOfTaxSupply = getLastDayOfMonth lastMonth
 
+                    let defaults : InvoiceDefaults =
+                        { Rate = 6000u
+                          Vat = Some 21uy
+                          ManDays = manDays
+                          DateOfTaxableSupply = dateOfTaxSupply
+                          InvoiceNumber = invoiceNumber
+                          AccountingPeriod = lastMonth
+                          Customer =
+                             { IdNumber = 0u
+                               VatId = VatId "CZ0000"
+                               Name = "Some customer"
+                               Address = ""
+                               Note = None }
+                           }
+                    return Ok defaults;
 
-                    return
-                        (coll.Query().OrderByDescending(fun x -> x.AccountingPeriod).FirstOrDefault() //
-                         |> (fun x -> if ((box x) = null) then None else Some x)
-                         |> Option.map (fun x ->
-                             { x with
-                                 ManDays = mandays
-                                 AccountingPeriod = lastMonth
-                                 InvoiceNumber = invoiceNumber
-                                 DateOfTaxableSupply = dateOfTaxSupply }
-                             |> Dto.fromInvoiceDto)
-
-                         |> Option.defaultValue (
-                             Ok
-                                 { Invoice.Id = Guid.Empty
-                                   Rate = 6000u
-                                   OrderNumber = None
-                                   Vat = Some 21uy
-                                   Customer =
-                                     { IdNumber = 0u
-                                       VatId = VatId "CZ0000"
-                                       Name = "Some customer"
-                                       Address = ""
-                                       Note = None }
-                                   ManDays = mandays
-                                   AccountingPeriod = lastMonth
-                                   InvoiceNumber = invoiceNumber
-                                   DateOfTaxableSupply = getLastDayOfMonth lastMonth }
-                         ))
+                    // return
+                    //     (coll.Query().OrderByDescending(fun x -> x.AccountingPeriod).FirstOrDefault() //
+                    //      |> (fun x -> if ((box x) = null) then None else Some x)
+                    //      |> Option.map (fun x ->
+                    //          Ok { defaults with
+                    //                   })
+                    //
+                    //      |> Option.defaultValue (Ok defaults)     )
 
                 with e ->
                     return Error e.Message
@@ -227,7 +222,7 @@ let invoiceApi =
             async {
                 try
                     use db = new LiteDatabase(connectionString)
-                    let coll = db.GetCollection<Dto.Invoice>("invoices")
+                    let coll = db.GetCollection<Invoice>("invoices")
 
                     let lastYear = DateTime.Now.AddYears(-1).Year
                     let currentYear = DateTime.Now.Year
@@ -248,10 +243,10 @@ let invoiceApi =
 
 
                     let lastQuarter =
-                        getQuarterTotals coll lastQuarterStart lastQuarterEnd
+                        getQuarterVatTotals coll lastQuarterStart lastQuarterEnd
 
                     let currentQuarter =
-                        getQuarterTotals coll currentQuarterStart currentQuarterEnd
+                        getQuarterVatTotals coll currentQuarterStart currentQuarterEnd
 
 
                     return
@@ -288,7 +283,7 @@ let invoiceApi =
             async {
                 try
                     use db = new LiteDatabase(connectionString)
-                    let coll = db.GetCollection<Dto.Invoice>("invoices")
+                    let coll = db.GetCollection<Invoice>("invoices")
                     let stream = generateSummaryReport coll type'
 
                     match stream with
@@ -338,7 +333,7 @@ let downloadHandler file : HttpHandler =
 
 let summaryReportHandler =
     use db = new LiteDatabase(connectionString)
-    let coll = db.GetCollection<Dto.Invoice>("invoices")
+    let coll = db.GetCollection<Invoice>("invoices")
 
     SummaryReportType.fromString
     >> generateSummaryReportFile coll
@@ -374,9 +369,8 @@ let app =
         memory_cache
         use_static "public"
         use_gzip
-    //use_client_certificate
+        //use_client_certificate
     }
 
 
-//FontSettings.FontsBaseDirectory = "./fonts" |> ignore
 run app
