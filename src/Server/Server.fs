@@ -1,9 +1,6 @@
 module Server
 
-open System.Net
 open System.Net.Http
-open System.Text
-open System.Threading
 open System.Xml.Linq
 open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
@@ -47,10 +44,7 @@ let invoiceApi =
             async {
                 try
                     use db = new LiteDatabase(connectionString)
-                    let coll = db.GetCollection<Invoice>("invoices")
-
-                    let dateTaxSupply =
-                        getLastDayOfMonth invoiceReq.AccountingPeriod
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
                     let invoiceNumber, seqNumber =
                         generateInvoiceNumber coll invoiceReq.AccountingPeriod
@@ -58,15 +52,15 @@ let invoiceApi =
                     let invoice =
                         { Id = NewId.NextGuid()
                           InvoiceNumber = invoiceNumber
-                          Items = [ ManDay(invoiceReq.Rate, invoiceReq.ManDays) ]
+                          Items = [ InvoiceItemInfo(ManDay(invoiceReq.Rate, invoiceReq.ManDays), None, false) ]
                           AccountingPeriod = invoiceReq.AccountingPeriod
-                          DateOfTaxableSupply = dateTaxSupply
+                          DateOfTaxableSupply = invoiceReq.DateOfTaxableSupply
                           OrderNumber = invoiceReq.OrderNumber
                           Vat = invoiceReq.Vat
                           Customer = invoiceReq.Customer
                           Created = DateTime.Now }
 
-                    invoice |> coll.Insert |> ignore
+                    invoice |> Dto.toInvoiceDto |> coll.Insert |> ignore
 
                     let outputFile =
                         Path.Combine(documentOutputDir, getInvoiceFileName invoiceReq.AccountingPeriod seqNumber)
@@ -91,7 +85,7 @@ let invoiceApi =
                     return
                         invoices
                             .Query()
-                            .OrderByDescending(fun i -> i.Inserted)
+                            .OrderByDescending(fun i -> i.Created)
                             .Select(fun i -> i.Customer)
                             .ToArray()
                         |> List.ofSeq
@@ -125,6 +119,7 @@ let invoiceApi =
                          |> List.ofSeq
                          |> List.traverseResultM Dto.fromInvoiceDto)
                         |> Result.map (fun x -> x, total)
+                        |> Result.mapError (String.concat Environment.NewLine)
                 with e ->
                     return Error e.Message
             }
@@ -147,36 +142,24 @@ let invoiceApi =
 
                     use db = new LiteDatabase(connectionString)
 
-                    let coll = db.GetCollection<Invoice>("invoices")
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
                     let invoiceNumber, _ = generateInvoiceNumber coll lastMonth
 
                     let dateOfTaxSupply = getLastDayOfMonth lastMonth
 
-                    let defaults : InvoiceDefaults =
-                        { Rate = 6000u
-                          Vat = Some 21uy
-                          ManDays = manDays
-                          DateOfTaxableSupply = dateOfTaxSupply
-                          InvoiceNumber = invoiceNumber
-                          AccountingPeriod = lastMonth
-                          Customer =
-                             { IdNumber = 0u
-                               VatId = VatId "CZ0000"
-                               Name = "Some customer"
-                               Address = ""
-                               Note = None }
-                           }
-                    return Ok defaults;
+                    let defaults: InvoiceDefaults =
+                        { InvoiceDefaults.Default with
+                            InvoiceNumber = invoiceNumber
+                            DateOfTaxableSupply = dateOfTaxSupply
+                            ManDays = manDays }
 
-                    // return
-                    //     (coll.Query().OrderByDescending(fun x -> x.AccountingPeriod).FirstOrDefault() //
-                    //      |> (fun x -> if ((box x) = null) then None else Some x)
-                    //      |> Option.map (fun x ->
-                    //          Ok { defaults with
-                    //                   })
-                    //
-                    //      |> Option.defaultValue (Ok defaults)     )
+                    return (coll.Query().OrderByDescending(fun x -> x.Created).FirstOrDefault()
+                     |> (fun x -> if ((box x) = null) then None else Some x)
+                     |> Option.map (fun x ->
+                         Ok { defaults with Customer = (x.Customer |> Dto.fromCustomerDto |> Option.ofResult)  })
+
+                     |> Option.defaultValue (Ok defaults) )
 
                 with e ->
                     return Error e.Message
@@ -222,103 +205,54 @@ let invoiceApi =
             async {
                 try
                     use db = new LiteDatabase(connectionString)
-                    let coll = db.GetCollection<Invoice>("invoices")
+                    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
-                    let lastYear = DateTime.Now.AddYears(-1).Year
-                    let currentYear = DateTime.Now.Year
-
-                    let lastYearTotal = getTotal coll lastYear
-                    let currentYearTotal = getTotal coll currentYear
-
-                    let { Start = lastQuarterStart
-                          End = lastQuarterEnd
-                          Number = lastQuarterNumber } =
-                        getPreviousQuarter DateTime.Now
-
-                    let { Start = currentQuarterStart
-                          End = currentQuarterEnd
-                          Number = currentQuarterNumber } =
-                        getQuarter DateTime.Now
-
-
-
-                    let lastQuarter =
-                        getQuarterVatTotals coll lastQuarterStart lastQuarterEnd
-
-                    let currentQuarter =
-                        getQuarterVatTotals coll currentQuarterStart currentQuarterEnd
-
-
-                    return
-                        { LastYear =
-                            { Value = decimal lastYearTotal
-                              Currency = "CZK"
-                              TimeRange = lastYear.ToString() }
-                          LastQuarter =
-                            { Value = decimal lastQuarter.Quarter
-                              Currency = "CZK"
-                              TimeRange = $"Q{lastQuarterNumber}" }
-                          LastQuarterVat =
-                            { Value = decimal lastQuarter.QuarterVat
-                              Currency = "CZK"
-                              TimeRange = $"Q{lastQuarterNumber}" }
-                          CurrentYear =
-                            { Value = decimal currentYearTotal
-                              Currency = "CZK"
-                              TimeRange = currentYear.ToString() }
-                          CurrentQuarter =
-                            { Value = decimal currentQuarter.Quarter
-                              Currency = "CZK"
-                              TimeRange = $"Q{currentQuarterNumber}" }
-                          CurrentQuarterVat =
-                            { Value = decimal currentQuarter.QuarterVat
-                              Currency = "CZK"
-                              TimeRange = $"Q{currentQuarterNumber}" } }
-                        |> Ok
-                with e ->
+                    return getTotals coll |> Result.mapError (String.concat Environment.NewLine)
+                 with e ->
                     return Error e.Message
             }
+
       prepareSummaryReportUrl =
-        fun type' ->
-            async {
-                try
-                    use db = new LiteDatabase(connectionString)
-                    let coll = db.GetCollection<Invoice>("invoices")
-                    let stream = generateSummaryReport coll type'
+          fun type' ->
+              async {
+                  try
+                      use db = new LiteDatabase(connectionString)
+                      let coll = db.GetCollection<Dto.Invoice>("invoices")
+                      let stream = generateSummaryReport coll type'
 
-                    match stream with
-                    | Error errs -> return Error(errs |> String.concat Environment.NewLine)
-                    | Ok stream ->
+                      match stream with
+                      | Error errs -> return Error(errs |> String.concat Environment.NewLine)
+                      | Ok stream ->
 
-                        use stream = stream
-                        do stream.Position <- 0L
+                          use stream = stream
+                          do stream.Position <- 0L
 
-                        use content = new StreamContent(stream)
-                        content.Headers.Add("Content-Type", "application/xml")
-                        let httpClientHandler = new HttpClientHandler()
-                        use httpClient = new HttpClient(httpClientHandler)
+                          use content = new StreamContent(stream)
+                          content.Headers.Add("Content-Type", "application/xml")
+                          let httpClientHandler = new HttpClientHandler()
+                          use httpClient = new HttpClient(httpClientHandler)
 
 
-                        let url =
-                            "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
+                          let url =
+                              "https://adisspr.mfcr.cz/dpr/epo_podani?otevriFormular=1"
 
-                        use requestMessage =
-                            new HttpRequestMessage(HttpMethod.Post, url)
+                          use requestMessage =
+                              new HttpRequestMessage(HttpMethod.Post, url)
 
-                        requestMessage.Content <- content
+                          requestMessage.Content <- content
 
-                        use! response = httpClient.PostAsync(url, content) |> Async.AwaitTask
+                          use! response = httpClient.PostAsync(url, content) |> Async.AwaitTask
 
-                        let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                          let! body = response.Content.ReadAsStringAsync() |> Async.AwaitTask
 
-                        if (not response.IsSuccessStatusCode) then
-                            return Error $"Remote api error {body}"
-                        else
-                            let url = (XDocument.Parse body).Root.Value
-                            return Ok url
-                with e ->
-                    return Error(e.Message + e.StackTrace)
-            } }
+                          if (not response.IsSuccessStatusCode) then
+                              return Error $"Remote api error {body}"
+                          else
+                              let url = (XDocument.Parse body).Root.Value
+                              return Ok url
+                  with e ->
+                      return Error(e.Message + e.StackTrace)
+              } }
 
 let downloadHandler file : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -333,7 +267,7 @@ let downloadHandler file : HttpHandler =
 
 let summaryReportHandler =
     use db = new LiteDatabase(connectionString)
-    let coll = db.GetCollection<Invoice>("invoices")
+    let coll = db.GetCollection<Dto.Invoice>("invoices")
 
     SummaryReportType.fromString
     >> generateSummaryReportFile coll
@@ -369,7 +303,7 @@ let app =
         memory_cache
         use_static "public"
         use_gzip
-        //use_client_certificate
+    //use_client_certificate
     }
 
 

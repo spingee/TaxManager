@@ -5,12 +5,13 @@ open LiteDB
 open System.IO
 open System
 open FsToolkit.ErrorHandling
+open Microsoft.FSharp.Core
 open Shared.Invoice
 open Report
 
 type DownloadFile = { FileName: string; ContentType: string; Stream: Stream }
 
-let generateInvoiceNumber (coll: ILiteCollection<Invoice>) (period: DateTime) =
+let generateInvoiceNumber (coll: ILiteCollection<Dto.Invoice>) (period: DateTime) =
     let y = period.Year
     let m = period.Month
 
@@ -20,9 +21,8 @@ let generateInvoiceNumber (coll: ILiteCollection<Invoice>) (period: DateTime) =
             .Where(fun f -> f.AccountingPeriod.Year = y && f.AccountingPeriod.Month = m)
             .ToArray()
 
-    let rec getInvoiceNumber (invoices: Invoice seq) sequenceNumber =
-        let invNumber =
-            sprintf "%i%02i%02i" period.Year period.Month sequenceNumber
+    let rec getInvoiceNumber (invoices: Dto.Invoice seq) sequenceNumber =
+        let invNumber = formatInvoiceNumber period sequenceNumber
 
         let result =
             invoices
@@ -40,7 +40,7 @@ let generateInvoiceNumber (coll: ILiteCollection<Invoice>) (period: DateTime) =
 let getInvoiceFileName (period: DateTime) index =
     sprintf "Faktura - %i-%02i-%02i" period.Year period.Month index
 
-let getTotal (coll: ILiteCollection<Invoice>) year =
+let getTotal (coll: ILiteCollection<Dto.Invoice>) year =
     let s = DateTime(year, 1, 1)
     let e = s.AddYears(1)
 
@@ -48,37 +48,52 @@ let getTotal (coll: ILiteCollection<Invoice>) year =
         .Query()
         .Where(fun i -> i.AccountingPeriod >= s && i.AccountingPeriod < e)
         .ToArray()
-    |> Seq.collect (fun i -> i.Items)
-    |> Seq.sumBy (function
-        | ManDay(manDay, rate) -> (decimal manDay) * (decimal rate)
-        | Additional(Total = total) -> total)
+    |> Seq.map Dto.fromInvoiceDto
+    |> List.ofSeq
+    |> List.sequenceResultM
+    |> Result.map (
+        Seq.collect (fun i -> i.Items)
+        >> Seq.sumBy (
+            extractInvoiceItem
+            >> function
+                | ManDay(manDay, rate) -> (decimal manDay) * (decimal rate)
+                | Additional(Total = total) -> total
+        )
+    )
 
-let getQuarterVatTotals (coll: ILiteCollection<Invoice>) quarterStart quarterEnd =
+
+let getQuarterVatTotals (coll: ILiteCollection<Dto.Invoice>) quarterStart quarterEnd =
     let invs =
         coll
             .Query()
             .Where(fun i -> i.AccountingPeriod >= quarterStart && i.AccountingPeriod < quarterEnd)
             .ToArray()
 
-    let total, totalVat =
-        invs
-        //only invoices with vat are needed for vat processing by government
-        |> Seq.filter (fun i ->
+
+    invs
+    |> Seq.map Dto.fromInvoiceDto
+    |> List.ofSeq
+    |> List.sequenceResultM
+    |> Result.map (
+        Seq.filter (fun i ->
+            //only invoices with vat are needed for vat processing by government
             match i.Vat with
             | Some _ -> true
             | _ -> false)
-        |> Seq.collect (fun i -> i.Items |> Seq.map (fun item -> item, decimal i.Vat.Value))
-        |> Seq.fold
+        >> Seq.collect (fun i ->
+            i.Items
+            |> Seq.map (fun item -> (item |> extractInvoiceItem), decimal i.Vat.Value))
+        >> Seq.fold
             (fun (total, totalVat) (item, vat) ->
-                let total =
+                let total' =
                     match item with
                     | ManDay(manDay, rate) -> (decimal manDay) * (decimal rate)
                     | Additional(Total = total) -> total
 
-                (total, total * (vat / 100M)))
+                (total' + total, (total' * (vat / 100M)) + totalVat))
             (0M, 0M)
-
-    {| Quarter = total; QuarterVat = totalVat |}
+        >> (fun (q, v) -> {| Quarter = q; QuarterVat = v |})
+    )
 
 let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
     use db = new LiteDatabase(connectionString)
@@ -88,7 +103,8 @@ let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
     let invoiceDto = invoices.FindById(BsonValue(invoiceId))
 
     let invoice =
-        Dto.fromInvoiceDto invoiceDto |> Result.valueOr failwith
+        Dto.fromInvoiceDto invoiceDto
+        |> Result.valueOr (String.concat Environment.NewLine >> failwith)
 
     let fileName = invoice.InvoiceNumber
 
@@ -100,50 +116,122 @@ let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
       Stream = stream }
 
 
-let generateSummaryReport (coll: ILiteCollection<Invoice>) (reportType: SummaryReportType) =
+let generateSummaryReport (coll: ILiteCollection<Dto.Invoice>) (reportType: SummaryReportType) =
     let getVatInput =
         let quarter = getPreviousQuarter DateTime.Now
 
         let year = quarter.Start.Year
         let startMonth = quarter.Start.Month
         let endMonth = quarter.End.AddMonths(-1).Month
-
-        let invs = coll
+        validation {
+            let! invs =
+                coll
                     .Query()
                     .Where(fun f ->
                         f.AccountingPeriod.Year = year
                         && f.AccountingPeriod.Month >= startMonth
                         && f.AccountingPeriod.Month <= endMonth)
                     .ToArray()
-                    |> List.ofSeq
+                |> List.ofSeq
+                |> List.map Dto.fromInvoiceDto
+                |> List.sequenceResultM
+            return
+                { Period = Quarter quarter
+                  DateOfFill = DateTime.Now
+                  Invoices = invs }
+        }
 
-        { Period = Quarter quarter
-          DateOfFill = DateTime.Now
-          Invoices = invs }
 
-
-    match reportType with
-    | AnnualTax ->
-        let year = DateTime.Now.AddYears(-1).Year
-
-        generateAnnualTaxReport
-            { Year = year |> uint16
-              ExpensesType = Virtual 60uy
-              DateOfFill = DateTime.Now
-              TotalEarnings = getTotal coll year
-              PenzijkoAttachment = None }
-    | QuartalVatAnnounce -> getVatInput |> generateVatAnnouncementReport
-    | QuartalVat -> getVatInput |> generateVatReport
-
-let generateSummaryReportFile (coll: ILiteCollection<Invoice>) (reportType: SummaryReportType) =
-    generateSummaryReport coll reportType
-    |> Result.map (fun s ->
-        let fileName =
+    validation {
+        return!
             match reportType with
-            | AnnualTax -> "dpfdp5_epo2.xml"
-            | QuartalVatAnnounce -> "dphkh1_epo2.xml"
-            | _ -> failwith $"Not implemented {reportType}"
+            | AnnualTax ->
+                let year = DateTime.Now.AddYears(-1).Year
+                validation {
+                    let! total = getTotal coll year
+                    return! generateAnnualTaxReport
+                        { Year = year |> uint16
+                          ExpensesType = Virtual 60uy
+                          DateOfFill = DateTime.Now
+                          TotalEarnings = total
+                          PenzijkoAttachment = None }
+                }
+            | QuartalVatAnnounce ->
+                validation {
+                    let! vatInput = getVatInput
+                    return! vatInput |> generateVatAnnouncementReport
+                }
+            | QuartalVat ->
+                validation {
+                    let! vatInput = getVatInput
+                    return! vatInput |> generateVatReport
+                }
+    }
 
-        { FileName = fileName
-          ContentType = "application/xml"
-          Stream = s })
+
+
+let generateSummaryReportFile (coll: ILiteCollection<Dto.Invoice>) (reportType: SummaryReportType) =
+    generateSummaryReport coll reportType
+    |> Result.bind (fun s ->
+        validation {
+            let fileName =
+                match reportType with
+                | AnnualTax -> "dpfdp5_epo2.xml"
+                | QuartalVatAnnounce -> "dphkh1_epo2.xml"
+                | _ -> failwith $"Not implemented {reportType}"
+
+            return
+                { FileName = fileName
+                  ContentType = "application/xml"
+                  Stream = s }
+        })
+
+let getTotals coll =
+    validation {
+        let lastYear = DateTime.Now.AddYears(-1).Year
+        let currentYear = DateTime.Now.Year
+
+        let { Start = lastQuarterStart
+              End = lastQuarterEnd
+              Number = lastQuarterNumber } =
+            getPreviousQuarter DateTime.Now
+
+        let { Start = currentQuarterStart
+              End = currentQuarterEnd
+              Number = currentQuarterNumber } =
+            getQuarter DateTime.Now
+
+
+        let! lastYearTotal = getTotal coll lastYear
+        and! currentYearTotal = getTotal coll currentYear
+
+        and! lastQuarter = getQuarterVatTotals coll lastQuarterStart lastQuarterEnd
+
+        and! currentQuarter = getQuarterVatTotals coll currentQuarterStart currentQuarterEnd
+
+        return
+            { LastYear =
+                { Value = decimal lastYearTotal
+                  Currency = "CZK"
+                  TimeRange = lastYear.ToString() }
+              LastQuarter =
+                { Value = decimal lastQuarter.Quarter
+                  Currency = "CZK"
+                  TimeRange = $"Q{lastQuarterNumber}" }
+              LastQuarterVat =
+                { Value = decimal lastQuarter.QuarterVat
+                  Currency = "CZK"
+                  TimeRange = $"Q{lastQuarterNumber}" }
+              CurrentYear =
+                { Value = decimal currentYearTotal
+                  Currency = "CZK"
+                  TimeRange = currentYear.ToString() }
+              CurrentQuarter =
+                { Value = decimal currentQuarter.Quarter
+                  Currency = "CZK"
+                  TimeRange = $"Q{currentQuarterNumber}" }
+              CurrentQuarterVat =
+                { Value = decimal currentQuarter.QuarterVat
+                  Currency = "CZK"
+                  TimeRange = $"Q{currentQuarterNumber}" } }
+    }

@@ -6,8 +6,7 @@ open System.Text.RegularExpressions
 
 
 module Invoice =
-    // for not not internal , becouse it wont serialze trough fable.remoting
-    type VatId = VatId of string
+    type VatId = private VatId of string
 
     type Quarter = { Number: uint; Start: DateTime; End: DateTime }
 
@@ -19,6 +18,12 @@ module Invoice =
         | false -> Error("Vat id has wrong format.")
 
     let getVatIdStr (VatId str) = str
+
+    let formatInvoiceNumber (month: DateTime) =
+        sprintf "%i%02i%02i" month.Year month.Day
+
+    let getLastDayOfMonth (month: DateTime) =
+        DateTime(int month.Year, int month.Month, 1).AddMonths(1).AddDays(-1)
 
     let getQuarter (d: DateTime) =
         match d.Month with
@@ -61,12 +66,15 @@ module Invoice =
 
     type InvoiceItem =
         | ManDay of Rate: uint32 * ManDays: uint8
-        | Additional of Label: string * Total: decimal
+        | Additional of Total: decimal
+
+    type InvoiceItemInfo = InvoiceItemInfo of InvoiceItem: InvoiceItem * Label: string option * Separate: bool
+    let extractInvoiceItem (InvoiceItemInfo(InvoiceItem = invoiceItem)) = invoiceItem
 
     type Invoice =
         { Id: Guid
           InvoiceNumber: string
-          Items: InvoiceItem list
+          Items: InvoiceItemInfo list
           AccountingPeriod: DateTime
           DateOfTaxableSupply: DateTime
           OrderNumber: string option
@@ -81,12 +89,25 @@ module Invoice =
           AccountingPeriod: DateTime
           DateOfTaxableSupply: DateTime
           Vat: uint8 option
-          Customer: Customer }
+          Customer: Customer option
+          OrderNumber: string option }
+
+        static member Default =
+            let lastMonth = DateTime.Now.AddMonths(-1)
+            { Rate = 6000u
+              Vat = Some 21uy
+              ManDays = 20uy
+              DateOfTaxableSupply = getLastDayOfMonth lastMonth
+              InvoiceNumber = formatInvoiceNumber lastMonth 1
+              AccountingPeriod = lastMonth.Date
+              Customer = None
+              OrderNumber = None }
 
     type TotalPrice =
         { Value: decimal
           Currency: string
           TimeRange: string }
+
         static member Default = { Value = 0m; Currency = "CZK"; TimeRange = "" }
 
     type Totals =
@@ -108,12 +129,15 @@ module Invoice =
 
     let getTotal inv =
         inv.Items
-        |> Seq.map (function
-            | ManDay(rate, manDays) -> (decimal manDays) * (decimal rate)
-            | Additional(Total = total) -> total)
+        |> Seq.map (
+            extractInvoiceItem
+            >> function
+                | ManDay(rate, manDays) -> (decimal manDays) * (decimal rate)
+                | Additional(Total = total) -> total
+        )
         |> Seq.sum
 
-    let getVatAmount (i:Invoice) =
+    let getVatAmount (i: Invoice) =
         i.Vat
         |> Option.map (fun v -> (getTotal i / 100M * (decimal v)))
         |> Option.defaultValue 0M
@@ -126,8 +150,11 @@ module Invoice =
         |> Option.map (fun v -> total + vat)
         |> Option.defaultValue total
 
-    let getLastDayOfMonth (accPeriod: DateTime) =
-        DateTime(int accPeriod.Year, int accPeriod.Month, 1).AddMonths(1).AddDays(-1)
+
+
+    let getManDayAndRate i =
+        i.Items
+        |> Seq.tryPick (extractInvoiceItem >> function | ManDay (m,r)  -> Some (m,r) | _ -> None)
 
 
 
@@ -135,6 +162,7 @@ module Invoice =
         | AnnualTax
         | QuartalVat
         | QuartalVatAnnounce
+
         static member fromString string =
             match string with
             | nameof (AnnualTax) -> AnnualTax
@@ -146,6 +174,7 @@ module Invoice =
         { ManDays: uint8
           Rate: uint32
           AccountingPeriod: DateTime
+          DateOfTaxableSupply: DateTime
           OrderNumber: string option
           Vat: uint8 option
           Customer: Customer }

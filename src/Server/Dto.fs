@@ -4,6 +4,7 @@ module Dto
 open System
 open Shared
 open FsToolkit.ErrorHandling
+open Shared.Invoice
 
 [<CLIMutable>]
 type Customer =
@@ -13,23 +14,34 @@ type Customer =
       Address: string
       Note: string }
 
+type InvoiceItemUnionCase =
+    | ManDay = 1
+    | Additional = 2
+
+[<CLIMutable>]
+type InvoiceItem =
+    { ManDays: Nullable<uint8>
+      Rate: Nullable<uint32>
+      Total: Nullable<decimal>
+      Label: string
+      Separate: bool
+      InvoiceItemUnionCase: InvoiceItemUnionCase }
+
 [<CLIMutable>]
 type Invoice =
     { Id: Guid
       InvoiceNumber: string
-      ManDays: uint8 option
-      Rate: uint32 option
-      Total: decimal
+      Items: InvoiceItem array
       AccountingPeriod: DateTime
       DateOfTaxableSupply: DateTime
       OrderNumber: string
       Vat: Nullable<int>
       Customer: Customer
-      Inserted: DateTime }
+      Created: DateTime }
 
 let fromCustomerDto (dto: Customer) =
     result {
-        let! vatId = Invoice.createVatId dto.VatId
+        let! vatId = createVatId dto.VatId
 
         let customer: Invoice.Customer =
             { IdNumber = dto.IdNumber
@@ -41,10 +53,10 @@ let fromCustomerDto (dto: Customer) =
         return customer
     }
 
-let toInvoiceDto inserted (invoice: Invoice.Invoice) : Invoice =
+let toInvoiceDto (invoice: Invoice.Invoice) : Invoice =
     let customer =
         { IdNumber = invoice.Customer.IdNumber
-          VatId = Invoice.getVatIdStr invoice.Customer.VatId
+          VatId = getVatIdStr invoice.Customer.VatId
           Name = invoice.Customer.Name
           Address = invoice.Customer.Address
           Note =
@@ -53,21 +65,30 @@ let toInvoiceDto inserted (invoice: Invoice.Invoice) : Invoice =
                 | None -> null
                 | Some s -> s }
 
-    let rate, manDays =
+    let items =
         invoice.Items
-        |> Seq.map (function
-            | Invoice.ManDay(rate, manDays) -> Some(rate, manDays)
-            | _ -> None)
-        //suppose we have only one ManDay item max
-        |> Seq.tryPick id
-        |> Option.map (fun (rate, manDays) -> Some rate, Some manDays)
-        |> Option.defaultValue (None, None)
+        |> List.map (fun (InvoiceItemInfo(item, label, separate)) ->
+            let label = match  label with | Some l -> l | _ -> null
+            match item with
+            | ManDay(rate, manDays) ->
+                { InvoiceItemUnionCase = InvoiceItemUnionCase.ManDay
+                  Label = label
+                  Total = Nullable<decimal>()
+                  Rate = Nullable<uint32>(rate)
+                  ManDays = Nullable<uint8>(manDays)
+                  Separate = separate }
+            | Additional total ->
+                { InvoiceItemUnionCase = InvoiceItemUnionCase.Additional
+                  Label = label
+                  Total = Nullable<decimal>(total)
+                  Rate = Nullable<uint32>()
+                  ManDays = Nullable<uint8>()
+                  Separate = separate })
+        |> Array.ofList
 
     { Id = invoice.Id
       InvoiceNumber = invoice.InvoiceNumber
-      ManDays = manDays
-      Rate = rate
-      Total = Invoice.getTotal invoice
+      Items = items
       AccountingPeriod = invoice.AccountingPeriod
       DateOfTaxableSupply = invoice.DateOfTaxableSupply
       OrderNumber =
@@ -77,31 +98,44 @@ let toInvoiceDto inserted (invoice: Invoice.Invoice) : Invoice =
             | Some s -> s
       Vat = invoice.Vat |> Option.map int |> Option.toNullable
       Customer = customer
-      Inserted = inserted }
+      Created = invoice.Created }
 
 let fromInvoiceDto (dto: Invoice) =
-    result {
+    validation {
         let! customer = fromCustomerDto dto.Customer
 
-        let! invoiceNumber =
+        and! invoiceNumber =
             if String.IsNullOrEmpty(dto.InvoiceNumber) then
                 Error $"Invoice number is null {dto}"
             else
                 Ok dto.InvoiceNumber
+        and! items =
+            dto.Items
+            |> Array.map (fun i ->
+                match i.InvoiceItemUnionCase with
+                | InvoiceItemUnionCase.ManDay ->
+                    match i.Rate.HasValue, i.ManDays.HasValue with
+                    | true, true -> Ok (InvoiceItemInfo (ManDay (i.Rate.Value, i.ManDays.Value), Option.ofNull(i.Label), i.Separate))
+                    | _ -> Error $"Item of type manday has unspecified rate or mandays {dto}"
+                | InvoiceItemUnionCase.Additional ->
+                    match i.Total.HasValue with
+                    | true ->Ok (InvoiceItemInfo (Additional i.Total.Value, Option.ofNull(i.Label), i.Separate))
+                    | _ -> Error $"Item of type additional has unspecified total {dto}"
+                | _ -> Error $"Unknown InvoiceItemUnionCase value {i.InvoiceItemUnionCase} {dto}")
+            |> List.ofArray
+            |> List.sequenceResultA
+
 
         let invoice: Invoice.Invoice =
             { Id = dto.Id
               InvoiceNumber = invoiceNumber
-              Items =
-                [ match dto.ManDays, dto.Rate with
-                          | Some manDays, Some rate -> Invoice.ManDay(rate, manDays)
-                          | _ -> () ]
+              Items = items
               AccountingPeriod = dto.AccountingPeriod
               DateOfTaxableSupply = dto.DateOfTaxableSupply
               OrderNumber = Option.ofObj dto.OrderNumber
               Vat = dto.Vat |> Option.ofNullable |> Option.map uint8
               Customer = customer
-              Created = dto.Inserted}
+              Created = dto.Created }
 
         return invoice
     }

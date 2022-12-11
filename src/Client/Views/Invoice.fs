@@ -5,7 +5,6 @@ open System
 open Fable.FontAwesome
 open Fable.React.Props
 open Fulma
-open Shared
 open Shared.Invoice
 open Utils
 open Fable.React
@@ -25,6 +24,7 @@ type Model =
       Rate: Validated<uint32>
       OrderNumber: Validated<string option>
       AccountingPeriod: DateTime
+      DateOfTaxableSupply: DateTime
       SelectedCustomer: Customer option
       VatApplicable: bool
       Vat: Validated<uint8 option>
@@ -54,6 +54,7 @@ type Msg =
     | AddInvoice of AsyncOperationStatus<Result<Invoice, string>>
     | SetRate of string
     | SetAccPeriod of DateTime
+    | SetDateOfTaxableSupply of DateTime
     | SetManDays of string
     | SetOrderNumber of string
     | SetVat of string
@@ -64,7 +65,7 @@ type Msg =
     | CustomerMsg of Customer.Msg
     | VatApplicable of bool
     | SearchBoxMsg of SearchBox.Msg
-    | LoadDefaults of AsyncOperationStatus<Result<Invoice.Invoice, string>>
+    | LoadDefaults of AsyncOperationStatus<Result<InvoiceDefaults, string>>
 
 type ExtMsg =
     | NoOp
@@ -78,14 +79,13 @@ let init () =
     let searchBoxModel, searchBoxCmd =
         SearchBox.init invoiceApi.searchOrderNumber
 
-    { Rate = Validated.success "6000" <| uint32 6000
-      ManDays = Validated.success "20" 20uy
-      AccountingPeriod = DateTime.Today.AddMonths(-1).Date
-      OrderNumber =
-          Validated.success "17Zak00002"
-          <| Some "17Zak00002"
-      VatApplicable = true
-      Vat = Validated.success "21" <| Some(uint8 21)
+    { Rate = Validated.success (InvoiceDefaults.Default.Rate.ToString()) <| InvoiceDefaults.Default.Rate
+      ManDays = Validated.success (InvoiceDefaults.Default.ManDays.ToString()) InvoiceDefaults.Default.ManDays
+      AccountingPeriod = InvoiceDefaults.Default.AccountingPeriod
+      DateOfTaxableSupply = InvoiceDefaults.Default.DateOfTaxableSupply
+      OrderNumber = Validated.success (match InvoiceDefaults.Default.OrderNumber with |Some s-> s |_ -> "") InvoiceDefaults.Default.OrderNumber
+      VatApplicable = match InvoiceDefaults.Default.Vat with | Some _ -> true | _ -> false
+      Vat = Validated.success (InvoiceDefaults.Default.Vat.ToString()) <| InvoiceDefaults.Default.Vat
       Customers = HasNotStartedYet
       AddingInvoice = HasNotStartedYet
       IsReadOnly = false
@@ -136,6 +136,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                       Rate = rateParsed
                       ManDays = manDaysParsed
                       AccountingPeriod = modelInvoiceInput.AccountingPeriod
+                      DateOfTaxableSupply = modelInvoiceInput.DateOfTaxableSupply
                       OrderNumber = orderNumber
                       Vat = vat }
             }
@@ -165,6 +166,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
 
         { model with Rate = rate }, Cmd.none, NoOp
     | SetAccPeriod v -> { model with AccountingPeriod = v }, Cmd.none, NoOp
+    | SetDateOfTaxableSupply v -> { model with DateOfTaxableSupply = v }, Cmd.none, NoOp
     | SetManDays v ->
         let md =
             match Byte.TryParse v with
@@ -307,9 +309,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
             | Ok  i ->
                 { model with
                       Rate = Validated.success (i.Rate.ToString()) i.Rate
-                      SelectedCustomer = Some i.Customer
+                      SelectedCustomer = i.Customer
                       ManDays = Validated.success (i.ManDays.ToString()) i.ManDays
                       AccountingPeriod = i.AccountingPeriod
+                      DateOfTaxableSupply = i.DateOfTaxableSupply
                       OrderNumber =
                           Validated.success
                               (i.OrderNumber
@@ -341,7 +344,11 @@ let view =
                     model.Rate
                     [ Input.Placeholder "Man-day rate in CZK"
                       Input.OnChange(fun x -> SetRate x.Value |> dispatch) ]
-
+                createTextField
+                    "Total number of man days"
+                    model.ManDays
+                    [ Input.Placeholder "Total number of man days"
+                      Input.OnChange(fun x -> SetManDays x.Value |> dispatch) ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Month of year" ]
@@ -367,12 +374,16 @@ let view =
                                               Flatpickr.ClassName "input" ]
                     ]
                 ]
-                createTextField
-                    "Total number of man days"
-                    model.ManDays
-                    [ Input.Placeholder "Total number of man days"
-                      Input.OnChange(fun x -> SetManDays x.Value |> dispatch) ]
-
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "Date od taxable supply" ]
+                        Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
+                                              Flatpickr.Value(model.DateOfTaxableSupply)
+                                              Flatpickr.DateFormat "d.m.Y"
+                                              Flatpickr.Locale Flatpickr.Locales.czech
+                                              Flatpickr.ClassName "input" ]
+                    ]
+                ]
 
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [

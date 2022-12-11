@@ -175,6 +175,11 @@ let view =
                                 |> List.sortByDescending (fun x -> x.AccountingPeriod)
                                 |> List.map
                                     (fun i ->
+                                        let manDay,rate =
+                                            getManDayAndRate i
+                                            |> function
+                                                | Some (m,r) -> m.ToString(), r.ToString()
+                                                | None -> "N/A", "N/A"
                                         tr [] [
                                             let total = getTotal i
                                             let vat = getVatAmount i
@@ -186,8 +191,8 @@ let view =
                                                 <| sprintf "%i/%i" iAccountingPeriod.Year iAccountingPeriod.Month
                                             ]
 
-                                            td [] [ str <| i.Rate.ToString() ]
-                                            td [] [ str <| i.ManDays.ToString() ]
+                                            td [] [ str <| manDay ]
+                                            td [] [ str <| rate ]
 
                                             td [] [
                                                 str

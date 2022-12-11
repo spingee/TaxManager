@@ -126,7 +126,7 @@ let generateWorkBook (invoice:Invoice) =
     //temporary pick just first ManDay item
     let manDay =
         invoice.Items
-        |> Seq.choose (function | ManDay(rate, manDays) -> Some (rate, manDays) | _ -> None)
+        |> Seq.choose (extractInvoiceItem >> function | ManDay(rate, manDays) -> Some (rate, manDays) | _ -> None)
         |> Seq.tryHead
         |> Option.iter (fun (rate, manDays) ->
                  ws.Cells.["A23"].Value <- sprintf "Počet MD: %i" manDays
