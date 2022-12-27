@@ -160,19 +160,20 @@ module Invoice =
 
     type SummaryReportType =
         | AnnualTax
-        | QuartalVat
-        | QuartalVatAnnounce
+        | QuarterVat
+        | QuarterVatAnnounce
 
         static member fromString string =
             match string with
-            | nameof (AnnualTax) -> AnnualTax
-            | nameof (QuartalVat) -> QuartalVat
-            | nameof (QuartalVatAnnounce) -> QuartalVatAnnounce
+            | nameof AnnualTax -> AnnualTax
+            | nameof QuarterVat -> QuarterVat
+            | nameof QuarterVatAnnounce -> QuarterVatAnnounce
             | _ -> failwithf "Not implemented: %s" string
 
     type AddInvoiceRequest =
         { ManDays: uint8
           Rate: uint32
+          AdditionalItem: decimal option
           AccountingPeriod: DateTime
           DateOfTaxableSupply: DateTime
           OrderNumber: string option

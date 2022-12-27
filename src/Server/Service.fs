@@ -156,12 +156,12 @@ let generateSummaryReport (coll: ILiteCollection<Dto.Invoice>) (reportType: Summ
                           TotalEarnings = total
                           PenzijkoAttachment = None }
                 }
-            | QuartalVatAnnounce ->
+            | QuarterVatAnnounce ->
                 validation {
                     let! vatInput = getVatInput
                     return! vatInput |> generateVatAnnouncementReport
                 }
-            | QuartalVat ->
+            | QuarterVat ->
                 validation {
                     let! vatInput = getVatInput
                     return! vatInput |> generateVatReport
@@ -177,7 +177,7 @@ let generateSummaryReportFile (coll: ILiteCollection<Dto.Invoice>) (reportType: 
             let fileName =
                 match reportType with
                 | AnnualTax -> "dpfdp5_epo2.xml"
-                | QuartalVatAnnounce -> "dphkh1_epo2.xml"
+                | QuarterVatAnnounce -> "dphkh1_epo2.xml"
                 | _ -> failwith $"Not implemented {reportType}"
 
             return

@@ -22,6 +22,7 @@ let monthSelectPlugin (x: obj) : obj -> obj =
 type Model =
     { ManDays: Validated<uint8>
       Rate: Validated<uint32>
+      AdditionalItem: Validated<decimal option>
       OrderNumber: Validated<string option>
       AccountingPeriod: DateTime
       DateOfTaxableSupply: DateTime
@@ -56,6 +57,7 @@ type Msg =
     | SetAccPeriod of DateTime
     | SetDateOfTaxableSupply of DateTime
     | SetManDays of string
+    | SetAdditionalItem of string
     | SetOrderNumber of string
     | SetVat of string
     | SelectCustomer of string
@@ -81,6 +83,7 @@ let init () =
 
     { Rate = Validated.success (InvoiceDefaults.Default.Rate.ToString()) <| InvoiceDefaults.Default.Rate
       ManDays = Validated.success (InvoiceDefaults.Default.ManDays.ToString()) InvoiceDefaults.Default.ManDays
+      AdditionalItem = Validated.success "" None
       AccountingPeriod = InvoiceDefaults.Default.AccountingPeriod
       DateOfTaxableSupply = InvoiceDefaults.Default.DateOfTaxableSupply
       OrderNumber = Validated.success (match InvoiceDefaults.Default.OrderNumber with |Some s-> s |_ -> "") InvoiceDefaults.Default.OrderNumber
@@ -127,6 +130,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                     | None -> Error "No customer selected."
 
                 and! rateParsed = modelInvoiceInput.Rate.Parsed
+                and! additionalItemParsed = modelInvoiceInput.AdditionalItem.Parsed
                 and! manDaysParsed = modelInvoiceInput.ManDays.Parsed
                 and! orderNumber = modelInvoiceInput.OrderNumber.Parsed
                 and! vat = modelInvoiceInput.Vat.Parsed
@@ -135,6 +139,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                     { Customer = customer
                       Rate = rateParsed
                       ManDays = manDaysParsed
+                      AdditionalItem = additionalItemParsed
                       AccountingPeriod = modelInvoiceInput.AccountingPeriod
                       DateOfTaxableSupply = modelInvoiceInput.DateOfTaxableSupply
                       OrderNumber = orderNumber
@@ -174,6 +179,14 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
             | false, _ -> Validated.failure v [ "Must be whole number 0-255." ]
 
         { model with ManDays = md }, Cmd.none, NoOp
+    | SetAdditionalItem v ->
+        let md =
+            match String.IsNullOrEmpty(v) ,Decimal.TryParse v with
+            | true ,_ -> Validated.success "" None
+            | _,(true , a) when a >= 0M -> Validated.success v (Some a)
+            | _ -> Validated.failure v [ "Must be positive decimal number." ]
+
+        { model with AdditionalItem = md }, Cmd.none, NoOp
     | SetOrderNumber v ->
         let orderNumber =
             if String.IsNullOrWhiteSpace(v) then
@@ -349,6 +362,11 @@ let view =
                     model.ManDays
                     [ Input.Placeholder "Total number of man days"
                       Input.OnChange(fun x -> SetManDays x.Value |> dispatch) ]
+                createTextField
+                    "Additional item (CZK)"
+                    model.AdditionalItem
+                    [ Input.Placeholder "Additional item (CZK)"
+                      Input.OnChange(fun x -> SetAdditionalItem x.Value |> dispatch) ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Month of year" ]

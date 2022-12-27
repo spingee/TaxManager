@@ -44,7 +44,7 @@ let Panel =
                                         OnClick
                                             (fun e ->
                                                 e.preventDefault ()
-                                                props.ReportRequest QuartalVatAnnounce) ] [
+                                                props.ReportRequest QuarterVatAnnounce) ] [
                                         Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsInfo ] ] [
                                             Fa.i [ Fa.Solid.Building; Fa.Size Fa.FaExtraSmall ] []
                                         ]
@@ -54,7 +54,7 @@ let Panel =
                                         OnClick
                                             (fun e ->
                                                 e.preventDefault ()
-                                                props.ReportRequest QuartalVat) ] [
+                                                props.ReportRequest QuarterVat) ] [
                                         Icon.icon [ Icon.Modifiers [ Modifier.TextColor IsSuccess ] ] [
                                             Fa.i [ Fa.Solid.Building; Fa.Size Fa.FaExtraSmall ] []
                                         ]

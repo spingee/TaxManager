@@ -52,7 +52,10 @@ let invoiceApi =
                     let invoice =
                         { Id = NewId.NextGuid()
                           InvoiceNumber = invoiceNumber
-                          Items = [ InvoiceItemInfo(ManDay(invoiceReq.Rate, invoiceReq.ManDays), None, false) ]
+                          Items = [ InvoiceItemInfo(ManDay(invoiceReq.Rate, invoiceReq.ManDays), None, false)
+                                    match invoiceReq.AdditionalItem with
+                                    | Some a -> InvoiceItemInfo(Additional(a), None, false)
+                                    | None -> () ]
                           AccountingPeriod = invoiceReq.AccountingPeriod
                           DateOfTaxableSupply = invoiceReq.DateOfTaxableSupply
                           OrderNumber = invoiceReq.OrderNumber
