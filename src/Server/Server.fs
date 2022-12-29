@@ -20,6 +20,7 @@ open MassTransit
 open System.Globalization
 open Giraffe
 open Service
+open System.Linq
 
 
 let connectionString =
@@ -52,10 +53,11 @@ let invoiceApi =
                     let invoice =
                         { Id = NewId.NextGuid()
                           InvoiceNumber = invoiceNumber
-                          Items = [ InvoiceItemInfo(ManDay(invoiceReq.Rate, invoiceReq.ManDays), None, false)
-                                    match invoiceReq.AdditionalItem with
-                                    | Some a -> InvoiceItemInfo(Additional(a), None, false)
-                                    | None -> () ]
+                          Items =
+                            [ InvoiceItemInfo(ManDay(invoiceReq.Rate, invoiceReq.ManDays), None, false)
+                              match invoiceReq.AdditionalItem with
+                              | Some a -> InvoiceItemInfo(Additional(a), None, false)
+                              | None -> () ]
                           AccountingPeriod = invoiceReq.AccountingPeriod
                           DateOfTaxableSupply = invoiceReq.DateOfTaxableSupply
                           OrderNumber = invoiceReq.OrderNumber
@@ -157,12 +159,30 @@ let invoiceApi =
                             DateOfTaxableSupply = dateOfTaxSupply
                             ManDays = manDays }
 
-                    return (coll.Query().OrderByDescending(fun x -> x.Created).FirstOrDefault()
-                     |> (fun x -> if ((box x) = null) then None else Some x)
-                     |> Option.map (fun x ->
-                         Ok { defaults with Customer = (x.Customer |> Dto.fromCustomerDto |> Option.ofResult)  })
+                    let lastInvoice =
+                        coll
+                            .Query()
+                            .OrderByDescending(fun x -> x.AccountingPeriod)
+                            .Limit(10)
+                            .ToArray()
+                            .OrderByDescending(fun x -> x.AccountingPeriod)
+                            .ThenByDescending(fun x -> x.Created)
+                            .FirstOrDefault()
+                        |> (fun x -> if ((box x) = null) then None else Some x)
+                        |> Option.map Dto.fromInvoiceDto
 
-                     |> Option.defaultValue (Ok defaults) )
+                    return
+                        match lastInvoice with
+                        | Some i ->
+                            i
+                            |> Result.map (fun x ->
+                                let rate = x |> getManDayAndRate |> Option.map fst
+
+                                match rate with
+                                | Some r -> { defaults with Customer = Some x.Customer; Rate = r }
+                                | None -> { defaults with Customer = Some x.Customer })
+                            |> Result.mapError (String.concat Environment.NewLine)
+                        | _ -> Ok defaults
 
                 with e ->
                     return Error e.Message
@@ -211,7 +231,7 @@ let invoiceApi =
                     let coll = db.GetCollection<Dto.Invoice>("invoices")
 
                     return getTotals coll |> Result.mapError (String.concat Environment.NewLine)
-                 with e ->
+                with e ->
                     return Error e.Message
             }
 
