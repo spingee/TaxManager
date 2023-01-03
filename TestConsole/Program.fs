@@ -48,7 +48,14 @@ type Invoice =
 
 [<EntryPoint>]
 let main argv =
+    let cultureInfo = System.Globalization.CultureInfo("cs-CZ")
 
+    do System.Threading.Thread.CurrentThread.CurrentCulture <- cultureInfo
+    do System.Threading.Thread.CurrentThread.CurrentUICulture <- cultureInfo
+    let trollik = 1556.564654M.ToString("C3")
+    let trollik2 = 1556M.ToString("C3")
+    let troll = $"%.2f{15546.000M} Kč"
+    let troll3 = $"{15546.000M} Kč"
     use db = new LiteDatabase(connectionString)
     use db2 = new LiteDatabase(connectionString2)
     let coll = db.GetCollection<Invoice>("invoices")

@@ -55,6 +55,9 @@ let private parseTotal total =
             .Replace(".", "")
     )
 
+let private formatCurrency (m:decimal) =
+    m.ToString("C2")
+
 
 type ExcelVariant =
     | New
@@ -94,14 +97,10 @@ let generateWorkBook (invoice:Invoice) =
             CultureInfo("cs-CZ").Calendar
         )
 
-
     let dueDate = date.AddMonths(2).AddDays(3.0)
-    let sumWithoutTax = getTotal invoice
-
-    let vat =
-        match invoice.Vat with
-        | Some v -> Math.Round(((float sumWithoutTax) * (float v / 100.0)), 0)
-        | None -> 0.0
+    let total = getTotal invoice |> formatCurrency
+    let vat =  getVatAmount invoice |> formatCurrency
+    let totalVat = getTotalWithVat invoice |> formatCurrency
 
 
     let shortDatePattern =
@@ -111,7 +110,6 @@ let generateWorkBook (invoice:Invoice) =
             .DateTimeFormat
             .ShortDatePattern
 
-    let total = float sumWithoutTax + vat
     ws.Cells.["D2"].Value <- invoice.InvoiceNumber
     ws.Cells.["D5"].Value <- invoice.InvoiceNumber
     ws.Cells.["C15"].Value <- invoice.DateOfTaxableSupply.ToString(shortDatePattern)
@@ -124,21 +122,20 @@ let generateWorkBook (invoice:Invoice) =
                                   invoice.AccountingPeriod.Year
 
     //temporary pick just first ManDay item
-    let manDay =
-        invoice.Items
-        |> Seq.choose (extractInvoiceItem >> function | ManDay(rate, manDays) -> Some (rate, manDays) | _ -> None)
-        |> Seq.tryHead
-        |> Option.iter (fun (rate, manDays) ->
-                 ws.Cells.["A23"].Value <- sprintf "Počet MD: %i" manDays
-                 ws.Cells.["A24"].Value <- sprintf "Sazba MD: %iKč" rate
-            )
+    invoice.Items
+    |> Seq.choose (extractInvoiceItem >> function | ManDay(rate, manDays) -> Some (rate, manDays) | _ -> None)
+    |> Seq.tryHead
+    |> Option.iter (fun (rate, manDays) ->
+             ws.Cells.["A23"].Value <- sprintf "Počet MD: %i" manDays
+             ws.Cells.["A24"].Value <- sprintf "Sazba MD: %iKč" rate
+        )
 
 
 
     match invoice.Vat with
     | Some v ->
-        ws.Cells.["D25"].Value <- sprintf "%f,-Kč" sumWithoutTax
-        ws.Cells.["D26"].Value <- sprintf "%.0f,-Kč" vat
+        ws.Cells.["D25"].Value <- total
+        ws.Cells.["D26"].Value <- vat
         ws.Cells.["C26"].Value <- sprintf "DPH %i%%" <| v
         ws.Cells.["A44"].Value <- "Poznámka: Dodavatel JE plátcem DPH."
     | None ->
@@ -149,7 +146,7 @@ let generateWorkBook (invoice:Invoice) =
         ws.Cells.["A44"].Value <- "Poznámka: Dodavatel NENÍ plátcem DPH."
 
 
-    ws.Cells.["D27"].Value <- sprintf "%.0f,-Kč" total
+    ws.Cells.["D27"].Value <- totalVat
     ws.Cells.["C11"].Value <- invoice.Customer.Address
     ws.Cells.["C10"].Value <- invoice.Customer.Name
     ws.Cells.["D7"].Value <- invoice.Customer.IdNumber
@@ -172,7 +169,7 @@ let generateWorkBook (invoice:Invoice) =
 let createExcelAndPdfInvoice (destFileWithoutExtension: string) invoice =
     let workbook = generateWorkBook invoice
     workbook.Save(sprintf "%s.xlsx" destFileWithoutExtension)
-    workbook.Save(sprintf "%s.pdf" destFileWithoutExtension)
+    //workbook.Save(sprintf "%s.pdf" destFileWithoutExtension)
 
 let generateExcelData invoice =
     let workbook = generateWorkBook invoice

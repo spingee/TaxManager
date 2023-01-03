@@ -20,7 +20,7 @@ module Invoice =
     let getVatIdStr (VatId str) = str
 
     let formatInvoiceNumber (month: DateTime) =
-        sprintf "%i%02i%02i" month.Year month.Day
+        sprintf "%i%02i%02i" month.Year month.Month
 
     let getLastDayOfMonth (month: DateTime) =
         DateTime(int month.Year, int month.Month, 1).AddMonths(1).AddDays(-1)
