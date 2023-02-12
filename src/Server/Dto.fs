@@ -34,6 +34,7 @@ type Invoice =
       Items: InvoiceItem array
       AccountingPeriod: DateTime
       DateOfTaxableSupply: DateTime
+      DueDate: DateTime
       OrderNumber: string
       Vat: Nullable<int>
       Customer: Customer
@@ -91,6 +92,7 @@ let toInvoiceDto (invoice: Invoice.Invoice) : Invoice =
       Items = items
       AccountingPeriod = invoice.AccountingPeriod
       DateOfTaxableSupply = invoice.DateOfTaxableSupply
+      DueDate = invoice.DueDate.ToDateTime(TimeOnly(0))
       OrderNumber =
         invoice.OrderNumber
         |> function
@@ -132,6 +134,7 @@ let fromInvoiceDto (dto: Invoice) =
               Items = items
               AccountingPeriod = dto.AccountingPeriod
               DateOfTaxableSupply = dto.DateOfTaxableSupply
+              DueDate = DateOnly.FromDateTime(dto.DueDate)
               OrderNumber = Option.ofObj dto.OrderNumber
               Vat = dto.Vat |> Option.ofNullable |> Option.map uint8
               Customer = customer

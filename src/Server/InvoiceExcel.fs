@@ -89,15 +89,6 @@ let generateWorkBook (invoice:Invoice) =
 
     let ws = workbook.Worksheets.[0]
 
-    let date =
-        DateTime(
-            int invoice.AccountingPeriod.Year,
-            int invoice.AccountingPeriod.Month,
-            1,
-            CultureInfo("cs-CZ").Calendar
-        )
-
-    let dueDate = date.AddMonths(2).AddDays(3.0)
     let total = getTotal invoice |> formatCurrency
     let vat =  getVatAmount invoice |> formatCurrency
     let totalVat = getTotalWithVat invoice |> formatCurrency
@@ -113,7 +104,7 @@ let generateWorkBook (invoice:Invoice) =
     ws.Cells.["D2"].Value <- invoice.InvoiceNumber
     ws.Cells.["D5"].Value <- invoice.InvoiceNumber
     ws.Cells.["C15"].Value <- invoice.DateOfTaxableSupply.ToString(shortDatePattern)
-    ws.Cells.["C16"].Value <- dueDate.ToString(shortDatePattern)
+    ws.Cells.["C16"].Value <-  invoice.DueDate.ToShortDateString()
     ws.Cells.["C18"].Value <- invoice.DateOfTaxableSupply.ToString(shortDatePattern)
 
     ws.Cells.["A20"].Value <- sprintf

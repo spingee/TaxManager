@@ -58,8 +58,9 @@ let invoiceApi =
                               match invoiceReq.AdditionalItem with
                               | Some a -> InvoiceItemInfo(Additional(a), None, false)
                               | None -> () ]
-                          AccountingPeriod = invoiceReq.AccountingPeriod
+                          AccountingPeriod = invoiceReq.AccountingPeriod.Date
                           DateOfTaxableSupply = invoiceReq.DateOfTaxableSupply
+                          DueDate = invoiceReq.DueDate
                           OrderNumber = invoiceReq.OrderNumber
                           Vat = invoiceReq.Vat
                           Customer = invoiceReq.Customer
@@ -97,7 +98,7 @@ let invoiceApi =
                         |> List.groupBy id
                         |> List.map fst
                         |> List.traverseResultA Dto.fromCustomerDto
-                        |> Result.mapError (fun e -> String.concat ", " e)
+                        |> Result.mapError (String.concat ", ")
 
                 with e ->
                     return Error e.Message

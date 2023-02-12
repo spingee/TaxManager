@@ -51,15 +51,8 @@ let getTotal (coll: ILiteCollection<Dto.Invoice>) year =
     |> Seq.map Dto.fromInvoiceDto
     |> List.ofSeq
     |> List.sequenceResultM
-    |> Result.map (
-        Seq.collect (fun i -> i.Items)
-        >> Seq.sumBy (
-            extractInvoiceItem
-            >> function
-                | ManDay(manDay, rate) -> (decimal manDay) * (decimal rate)
-                | Additional(Total = total) -> total
-        )
-    )
+    |> Result.map (Seq.sumBy getTotal)
+
 
 
 let getQuarterVatTotals (coll: ILiteCollection<Dto.Invoice>) quarterStart quarterEnd =
@@ -98,16 +91,15 @@ let getQuarterVatTotals (coll: ILiteCollection<Dto.Invoice>) quarterStart quarte
 let generateInvoiceExcel (connectionString: string) (invoiceId: Guid) =
     use db = new LiteDatabase(connectionString)
 
-    let invoices = db.GetCollection<Dto.Invoice>("invoices")
-
-    let invoiceDto = invoices.FindById(BsonValue(invoiceId))
+    let invoices =
+        db.GetCollection<Dto.Invoice>("invoices")
 
     let invoice =
-        Dto.fromInvoiceDto invoiceDto
+        invoices.FindById(BsonValue(invoiceId))
+        |> Dto.fromInvoiceDto
         |> Result.valueOr (String.concat Environment.NewLine >> failwith)
 
     let fileName = invoice.InvoiceNumber
-
 
     let stream = generateExcelData invoice
 

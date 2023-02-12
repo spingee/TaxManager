@@ -32,18 +32,30 @@ type Customer =
       Address: string
       Note: string }
 
+type InvoiceItemUnionCase =
+    | ManDay = 1
+    | Additional = 2
+
+[<CLIMutable>]
+type InvoiceItem =
+    { ManDays: Nullable<uint8>
+      Rate: Nullable<uint32>
+      Total: Nullable<decimal>
+      Label: string
+      Separate: bool
+      InvoiceItemUnionCase: InvoiceItemUnionCase }
+
 [<CLIMutable>]
 type Invoice =
     { Id: Guid
       InvoiceNumber: string
-      ManDays: uint8
-      Rate: uint32
+      Items: InvoiceItem array
       AccountingPeriod: DateTime
       DateOfTaxableSupply: DateTime
       OrderNumber: string
       Vat: Nullable<int>
       Customer: Customer
-      Inserted: DateTime }
+      Created: DateTime }
 
 
 [<EntryPoint>]
@@ -52,42 +64,28 @@ let main argv =
 
     do System.Threading.Thread.CurrentThread.CurrentCulture <- cultureInfo
     do System.Threading.Thread.CurrentThread.CurrentUICulture <- cultureInfo
-    let trollik = 1556.564654M.ToString("C3")
-    let trollik2 = 1556M.ToString("C3")
-    let troll = $"%.2f{15546.000M} Kč"
-    let troll3 = $"{15546.000M} Kč"
+
     use db = new LiteDatabase(connectionString)
     use db2 = new LiteDatabase(connectionString2)
-    let coll = db.GetCollection<Invoice>("invoices")
-    let coll2 = db2.GetCollection<Dto.Invoice>("invoices")
+    let coll = db.GetCollection<Dto.Invoice>("invoices")
+    //let coll2 = db2.GetCollection<Dto.Invoice>("invoices")
 
-    let lol = coll2.Query().ToArray();
+    //let lol = coll2.Query().ToArray();
 
-    // let olds: Dto.Invoice seq =
-    //     coll.Query().ToArray()
-    //     |> Seq.map (fun old ->
-    //         { Dto.Invoice.Id = old.Id
-    //           Dto.Invoice.Created = old.Inserted
-    //           Dto.Invoice.Vat = old.Vat
-    //           Dto.Invoice.OrderNumber = old.OrderNumber
-    //           Dto.Invoice.DateOfTaxableSupply = old.DateOfTaxableSupply
-    //           Dto.Invoice.AccountingPeriod = old.AccountingPeriod
-    //           Dto.Invoice.InvoiceNumber = old.InvoiceNumber
-    //           Dto.Invoice.Customer =
-    //             { Address = old.Customer.Address
-    //               Name = old.Customer.Name
-    //               Note = old.Customer.Note
-    //               IdNumber = old.Customer.IdNumber
-    //               VatId = old.Customer.VatId }
-    //           Dto.Invoice.Items =
-    //             [| { InvoiceItemUnionCase = Dto.InvoiceItemUnionCase.ManDay
-    //                  Total = Nullable<decimal>()
-    //                  ManDays = Nullable<uint8>(old.ManDays)
-    //                  Rate = Nullable<uint32>(old.Rate)
-    //                  Separate = false
-    //                  Label = null } |] })
-    //
-    // let inserted = coll2.InsertBulk olds
+    let olds: Dto.Invoice seq =
+        coll.Query().ToArray()
+        |> Seq.map (fun old ->
+            let dueDate =
+                match
+                    (old.AccountingPeriod.Month > 5 && old.AccountingPeriod.Year = 2022)
+                    || old.AccountingPeriod.Year >= 2023
+                with
+                | true -> DateTime(old.AccountingPeriod.Year, old.AccountingPeriod.Month, 15)
+                | false -> getLastDayOfMonth old.AccountingPeriod
+
+            { old with DueDate = dueDate })
+
+    let inserted = coll.Update olds
 
     //a.Add(1)
     Console.ReadLine() |> ignore

@@ -77,6 +77,7 @@ module Invoice =
           Items: InvoiceItemInfo list
           AccountingPeriod: DateTime
           DateOfTaxableSupply: DateTime
+          DueDate: DateOnly
           OrderNumber: string option
           Vat: uint8 option
           Customer: Customer
@@ -88,6 +89,7 @@ module Invoice =
           Rate: uint32
           AccountingPeriod: DateTime
           DateOfTaxableSupply: DateTime
+          DueDate: DateTime
           Vat: uint8 option
           Customer: Customer option
           OrderNumber: string option }
@@ -98,6 +100,7 @@ module Invoice =
               Vat = Some 21uy
               ManDays = 20uy
               DateOfTaxableSupply = getLastDayOfMonth lastMonth
+              DueDate= getLastDayOfMonth DateTime.Now
               InvoiceNumber = formatInvoiceNumber lastMonth 1
               AccountingPeriod = lastMonth.Date
               Customer = None
@@ -176,6 +179,7 @@ module Invoice =
           AdditionalItem: decimal option
           AccountingPeriod: DateTime
           DateOfTaxableSupply: DateTime
+          DueDate: DateOnly
           OrderNumber: string option
           Vat: uint8 option
           Customer: Customer }

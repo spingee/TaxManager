@@ -26,6 +26,7 @@ type Model =
       OrderNumber: Validated<string option>
       AccountingPeriod: DateTime
       DateOfTaxableSupply: DateTime
+      DueDate: DateTime
       SelectedCustomer: Customer option
       VatApplicable: bool
       Vat: Validated<uint8 option>
@@ -56,6 +57,7 @@ type Msg =
     | SetRate of string
     | SetAccPeriod of DateTime
     | SetDateOfTaxableSupply of DateTime
+    | SetDueDate of DateTime
     | SetManDays of string
     | SetAdditionalItem of string
     | SetOrderNumber of string
@@ -86,6 +88,7 @@ let init () =
       AdditionalItem = Validated.success "" None
       AccountingPeriod = InvoiceDefaults.Default.AccountingPeriod
       DateOfTaxableSupply = InvoiceDefaults.Default.DateOfTaxableSupply
+      DueDate = InvoiceDefaults.Default.DueDate
       OrderNumber = Validated.success (match InvoiceDefaults.Default.OrderNumber with |Some s-> s |_ -> "") InvoiceDefaults.Default.OrderNumber
       VatApplicable = match InvoiceDefaults.Default.Vat with | Some _ -> true | _ -> false
       Vat = Validated.success (InvoiceDefaults.Default.Vat.ToString()) <| InvoiceDefaults.Default.Vat
@@ -142,6 +145,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                       AdditionalItem = additionalItemParsed
                       AccountingPeriod = modelInvoiceInput.AccountingPeriod
                       DateOfTaxableSupply = modelInvoiceInput.DateOfTaxableSupply
+                      DueDate = DateOnly.FromDateTime modelInvoiceInput.DueDate
                       OrderNumber = orderNumber
                       Vat = vat }
             }
@@ -172,6 +176,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
         { model with Rate = rate }, Cmd.none, NoOp
     | SetAccPeriod v -> { model with AccountingPeriod = v }, Cmd.none, NoOp
     | SetDateOfTaxableSupply v -> { model with DateOfTaxableSupply = v }, Cmd.none, NoOp
+    | SetDueDate v -> { model with DueDate = v }, Cmd.none, NoOp
     | SetManDays v ->
         let md =
             match Byte.TryParse v with
@@ -395,8 +400,19 @@ let view =
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
                         Label.label [] [ str "Date od taxable supply" ]
-                        Flatpickr.flatpickr [ Flatpickr.OnChange(SetAccPeriod >> dispatch)
+                        Flatpickr.flatpickr [ Flatpickr.OnChange(SetDateOfTaxableSupply >> dispatch)
                                               Flatpickr.Value(model.DateOfTaxableSupply)
+                                              Flatpickr.DateFormat "d.m.Y"
+                                              Flatpickr.Locale Flatpickr.Locales.czech
+                                              Flatpickr.ClassName "input" ]
+                    ]
+                ]
+
+                Field.div [ Field.IsGrouped ] [
+                    Control.p [ Control.IsExpanded ] [
+                        Label.label [] [ str "Due date" ]
+                        Flatpickr.flatpickr [ Flatpickr.OnChange(SetDueDate >> dispatch)
+                                              Flatpickr.Value(model.DueDate)
                                               Flatpickr.DateFormat "d.m.Y"
                                               Flatpickr.Locale Flatpickr.Locales.czech
                                               Flatpickr.ClassName "input" ]
