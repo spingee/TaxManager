@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:6.0 as build
+FROM mcr.microsoft.com/dotnet/sdk:7.0 as build
 
 #WORKDIR /workspace
 #COPY . .
@@ -41,7 +41,7 @@ RUN dotnet fable src/Client -o src/Client/output -s --run npm run build
 RUN cd src/Server && dotnet publish -c release -o ../../deploy
 
 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS final
 #install font for document converter
 RUN apt-get update \
 && apt-get install -y --allow-unauthenticated libc6-dev \

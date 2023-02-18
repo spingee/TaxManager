@@ -10,7 +10,7 @@ module Invoice =
 
     type Quarter = { Number: uint; Start: DateTime; End: DateTime }
 
-    let createVatId str =
+    let createVatId (str:string) =
         let legit = Regex("^[A-Z]{2}[A-Z0-9]+$").IsMatch(str)
 
         match legit with
