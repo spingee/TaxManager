@@ -27,7 +27,7 @@ type Model =
       AccountingPeriod: DateTime
       DateOfTaxableSupply: DateTime
       DueDate: DateTime
-      SelectedCustomer: Customer option
+      SelectedCustomer: Validated<Customer>
       VatApplicable: bool
       Vat: Validated<uint8 option>
       Customers: Deferred<Customer list>
@@ -39,18 +39,15 @@ type Model =
       SearchBoxModel: SearchBox.Model }
 
 let isValid input =
-    let { Model.ManDays = mandays
+    let { ManDays = mandays
           Rate = rate
-          OrderNumber = orderNumber } =
+          OrderNumber = orderNumber
+          SelectedCustomer= customer } =
         input
 
-    match (mandays.Parsed, rate.Parsed, orderNumber.Parsed) with
-    | Ok _, Ok _, Ok _ -> true
-    | _, _, _ -> false
-
-let isModelValid model =
-    isValid model
-    && Option.isSome model.SelectedCustomer
+    match (mandays.Parsed, rate.Parsed, orderNumber.Parsed,customer.Parsed ) with
+    | Ok _, Ok _, Ok _, Ok _ -> true
+    | _, _, _, _ -> false
 
 type Msg =
     | AddInvoice of AsyncOperationStatus<Result<Invoice, string>>
@@ -97,7 +94,7 @@ let init () =
       IsReadOnly = false
       Result = None
       CustomerModel = submodel
-      SelectedCustomer = None
+      SelectedCustomer = Validated.createEmpty()
       CreatingCustomer = false
       SearchBoxModel = searchBoxModel },
 
@@ -127,11 +124,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
         let inv =
             validation {
 
-                let! customer =
-                    match model.SelectedCustomer with
-                    | Some c -> Ok c
-                    | None -> Error "No customer selected."
-
+                let! customer = model.SelectedCustomer.Parsed
                 and! rateParsed = modelInvoiceInput.Rate.Parsed
                 and! additionalItemParsed = modelInvoiceInput.AdditionalItem.Parsed
                 and! manDaysParsed = modelInvoiceInput.ManDays.Parsed
@@ -220,15 +213,18 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
         Cmd.none,
         NoOp
     | BeginCreateCustomer ->
-        //model,Cmd.none
-        { model with CreatingCustomer = true }, Cmd.ofMsg (CustomerMsg(Customer.Start model.SelectedCustomer)), NoOp
+        let customer =
+            match model.SelectedCustomer.Parsed with
+            | Ok c -> Some c
+            | _ -> None
+        { model with CreatingCustomer = true }, Cmd.ofMsg (CustomerMsg(Customer.Start customer)), NoOp
     | CustomerMsg msg ->
         match msg with
         | Customer.Finish c ->
             let model =
                 { model with
                       CreatingCustomer = false
-                      SelectedCustomer = Some c }
+                      SelectedCustomer = Validated.success "" c  }
 
             let custs =
                 match model.Customers with
@@ -256,8 +252,8 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
             match model.Customers, (String.IsNullOrWhiteSpace str) with
             | Resolved custs, false ->
                 { model with
-                      SelectedCustomer = Some custs.[(int str)] }
-            | _, _ -> { model with SelectedCustomer = None }
+                      SelectedCustomer = Validated.success "" custs[(int str)] }
+            | _, _ -> { model with SelectedCustomer = Validated.createEmpty() }
 
         model, Cmd.none, NoOp
     | LoadCustomers Started ->
@@ -277,8 +273,8 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
                   | Error _ -> Resolved []
               SelectedCustomer =
                   match result with
-                  | Ok cs when cs.Length > 0 -> Some cs.Head
-                  | _ -> None
+                  | Ok cs when cs.Length > 0 -> Validated.success "" cs.Head
+                  | _ -> Validated.createEmpty()
               Result =
                   match result with
                   | Ok _ -> None
@@ -327,7 +323,7 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> * ExtMsg =
             | Ok  i ->
                 { model with
                       Rate = Validated.success (i.Rate.ToString()) i.Rate
-                      SelectedCustomer = i.Customer
+                      SelectedCustomer = match i.Customer with | Some  c ->  Validated.success "" c | _ -> Validated.createEmpty()
                       ManDays = Validated.success (i.ManDays.ToString()) i.ManDays
                       AccountingPeriod = i.AccountingPeriod
                       DateOfTaxableSupply = i.DateOfTaxableSupply
@@ -436,9 +432,9 @@ let view =
                             Select.select [ Select.IsFullWidth
                                             Select.IsLoading(model.Customers |> Deferred.inProgress) ] [
                                 select [ OnChange(fun e -> dispatch <| SelectCustomer e.Value) ] [
-                                    match model.SelectedCustomer with
-                                    | None -> yield option [ Value("") ] [ str "" ]
-                                    | _ -> ()
+                                    match model.SelectedCustomer.Parsed with
+                                    | Ok _ -> ()
+                                    | _ -> yield option [ Value("") ] [ str "" ]
                                     match model.Customers with
                                     | Resolved custs ->
                                         for i = 0 to custs.Length - 1 do
@@ -446,12 +442,19 @@ let view =
 
                                             yield
                                                 option [ Value(i)
-                                                         Selected(model.SelectedCustomer = Some c) ] [
+                                                         Selected(model.SelectedCustomer = Validated.success "" c) ] [
                                                     str <| sprintf "%s (%i)" c.Name c.IdNumber
                                                 ]
                                     | _ -> ()
                                 ]
                             ]
+                            match model.SelectedCustomer.Parsed with
+                             | Error []
+                             | Ok _ -> Html.none
+                             | Error (e :: _) ->
+                                    Help.help [ Help.Color IsDanger ] [
+                                        str e
+                                    ]
                         ]
                         Control.p [] [
                             Button.a [ Button.Color IsPrimary
@@ -501,7 +504,7 @@ let view =
                     Control.p [] [
                         Button.button [ Button.Color IsPrimary
                                         Button.IsLoading model.IsReadOnly
-                                        //Button.Disabled(isModelValid model |> not)
+                                        Button.Disabled(isValid model |> not)
                                         Button.OnClick(fun _ -> dispatch (AddInvoice Started)) ] [
                             str "Add"
                         ]
