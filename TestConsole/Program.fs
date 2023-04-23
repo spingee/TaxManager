@@ -1,4 +1,5 @@
 open System
+open System.Collections.Generic
 open System.IO
 open Azure.AI.OpenAI
 open Report
@@ -9,6 +10,7 @@ open System.Collections
 open Shared.Invoice
 open UglyToad.PdfPig
 open System.Text.Json
+open FsToolkit.ErrorHandling
 
 let fff<'t> = System.Collections.Generic.List<'t>()
 
@@ -90,7 +92,77 @@ type InvoicePdf =
     { DateOfTaxableSupply: DateTime
       TaxBase: decimal
       VatPercent: decimal
-      Vat: decimal }
+      Vat: decimal
+      VatNumber: string
+      InvoiceNumber: string
+      FileName: string }
+
+
+
+//todo musi byt mimo kod, push na github zrusi ten api key v openapi
+let [<Literal>]openAiKey = "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"
+
+//let [<Literal>]deploymentId = "text-davinci-003"
+let [<Literal>]deploymentId = "gpt-4"
+
+let getPrompt pdfText = $"""
+Extrahuj ve formátu json (názvy propert v uvozovkách): daň respektive 'výše dph' (Vat jako number), daň %% (VatPercent jako number),
+základ daně (TaxBase jako number) a datum uskutečnění plnění (DateOfTaxableSupply, případně datum vystavení), čislo dokladu/vyúčtování/faktury (InvoiceNumber jako string),
+DIČ dodavatele (VatNumber jako string, nesmí být DIČ odběratele!).
+Bez jednotek hodnot, datum v iso formátu, preferuj číselné hodnoty co jsou nejblíže u sebe:
+{pdfText}
+"""
+
+let extractPdfInvoice pdfFilePath =
+    printfn $"Processing %s{pdfFilePath}"
+    let pdfDoc = PdfDocument.Open(pdfFilePath)
+    let pdfText =
+        pdfDoc.GetPages()
+        |> Seq.chunkBySize 2
+        |> Seq.take 1//only first two pages
+        |> Seq.concat
+        |> Seq.map (fun page -> page.GetWords())
+        |> Seq.map (fun words -> words |> Seq.map (fun word -> word.Text) |> String.concat " ")
+        |> String.concat Environment.NewLine
+
+    let prompt = getPrompt pdfText
+    let prompt = prompt.Substring(0, Math.Min(prompt.Length, 4096))
+    let openAiClient = OpenAIClient(openAiKey)
+    let options = CompletionsOptions()
+    options.Prompts.Add prompt
+    options.MaxTokens <- 250
+    options.Temperature <- 0.5f
+    options.FrequencyPenalty <- 0.0f
+    options.PresencePenalty <- 0.0f
+    options.NucleusSamplingFactor <- 1f
+
+    let resp = openAiClient.GetCompletions(deploymentId, options)
+    printfn "Usage: %i" resp.Value.Usage.TotalTokens
+
+    let resultStr = resp.Value.Choices
+                 |> Seq.map (fun x -> x.Text)
+                 |> Seq.head
+
+
+    Console.WriteLine(resultStr)
+
+    try
+        Result.Ok (JsonSerializer.Deserialize<InvoicePdf>(resultStr))
+    with ex ->
+        Result.Error $"Cannot deserialize result:{Environment.NewLine}{resultStr}{Environment.NewLine}{ex.Message}{Environment.NewLine}{pdfFilePath}"
+    |> Result.map (fun result ->
+        let result' = { result with FileName = pdfFilePath }
+        Console.WriteLine(result')
+        result')
+    |> Result.bind (fun result ->
+          let computedVatPercent = (100m / result.TaxBase) * result.Vat
+          match (Math.Abs(computedVatPercent - result.VatPercent) < 0.2m) with
+            | true -> Result.Ok result
+            | false -> Result.Error $"Values are not correct {result}")
+
+
+
+
 
 
 [<EntryPoint>]
@@ -101,54 +173,42 @@ let main argv =
     do System.Threading.Thread.CurrentThread.CurrentUICulture <- cultureInfo
 
 
-    let openAiKey = "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"
-    let deploymentId = "text-davinci-003"
-    let openAiClient = OpenAIClient(openAiKey)
-    let pdfFilePath = "/Users/janstrnad/Library/CloudStorage/OneDrive-Personal/Dokumenty/Faktury/DPH 2023-1/Vstup/"
-    let sum =
-        Directory.GetFiles(pdfFilePath, "*.pdf")
-        |> Seq.map (fun pdfFile ->
-            printfn $"Processing %s{pdfFile}"
-            let pdfDoc = PdfDocument.Open(pdfFile)
-            let pdfText =
-                pdfDoc.GetPages()
-                |> Seq.map (fun page -> page.GetWords())
-                |> Seq.map (fun words -> words |> Seq.map (fun word -> word.Text) |> String.concat " ")
-                |> String.concat Environment.NewLine
+
+    use db = new LiteDatabase(@"FileName=/Users/janstrnad/OneDrive/Dokumenty/Faktury/TaxManagerDb/taxreturns.db;Connection=shared")
+    let coll = db.GetCollection<InvoicePdf>("tax_return_invoices")
+
+    let pdfFilePath = "/Users/janstrnad/Library/CloudStorage/OneDrive-Personal/Dokumenty/Faktury/DPH 2022-1/"
+    let extracted =
+        Directory.EnumerateDirectories(pdfFilePath, "Vstup", SearchOption.AllDirectories)
+        |> Seq.map (fun x -> Directory.EnumerateFiles(x, "Vodafone Vyúčtování číslo 826755915.pdf"))
+        |> Seq.concat
+        |> Seq.map extractPdfInvoice
+        |> Seq.fold (fun (o,e) x  ->
+            match x with
+            | Ok x ->
+                //coll.Insert x |> ignore
+                (x::o,e)
+            | Error x -> (o,x::e)
+            ) ([],[])
 
 
-            let prompt = $"""
-    Extrahuj ve formátu json daň (Vat jako number), daň procentuálě (VatPercent jako number), základ daně (TaxBase jako number) a datum uskutečnění plnění (DateOfTaxableSupply).
-    Bez jednotek hodnot, datum v iso formátu:
-    {pdfText}
-    """
 
-            let options = CompletionsOptions()
-            options.Prompts.Add prompt
-            options.MaxTokens <- 100
-            options.Temperature <- 0.5f
-            options.FrequencyPenalty <- 0.0f
-            options.PresencePenalty <- 0.0f
-            options.NucleusSamplingFactor <- 1f
+    printfn "Total %i, Succeeded %i, Failed %i" ((fst extracted).Length + (snd extracted).Length) (fst extracted).Length (snd extracted).Length
 
-            let resp = openAiClient.GetCompletions(deploymentId, options)
-            let resultStr = resp.Value.Choices
-                         |> Seq.map (fun x -> x.Text)
-                         |> Seq.head
+    // fst extracted
+    //     |> coll.InsertBulk
+    //     |> ignore
+
+    fst extracted
+        |> List.fold (fun (t,v) x -> (x.TaxBase + t, x.Vat + v )) (0m,0m)
+        |> Printf.printfn "Total: %A"
+
+    snd extracted
+        |> List.iter (fun x ->
+            Console.ForegroundColor <- ConsoleColor.Red
+            printfn $"Error: %A{x}"
+            Console.ResetColor())
 
 
-            Console.WriteLine(resultStr)
-            let result = JsonSerializer.Deserialize<InvoicePdf>(resultStr)
-            Console.WriteLine(result)
-            result
-        ) |> Seq.fold (fun (t,v) x -> (x.TaxBase + t, x.Vat + v )) (0m,0m)
-
-    sum |> printfn "Total: %A"
-
-    match sum = (3121.71M, 655.58M) with
-    | true -> printfn "OK"
-    | false -> printfn "FAIL"
-
-    //a.Add(1)
     Console.ReadLine() |> ignore
     0
