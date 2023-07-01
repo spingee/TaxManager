@@ -102,14 +102,14 @@ type InvoicePdf =
 //todo musi byt mimo kod, push na github zrusi ten api key v openapi
 let [<Literal>]openAiKey = "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"
 
-//let [<Literal>]deploymentId = "text-davinci-003"
-let [<Literal>]deploymentId = "gpt-4"
+let [<Literal>]deploymentId = "text-davinci-003"
+//let [<Literal>]deploymentId = "gpt-4"
 
 let getPrompt pdfText = $"""
 Extrahuj ve formátu json (názvy propert v uvozovkách): daň respektive 'výše dph' (Vat jako number), daň %% (VatPercent jako number),
 základ daně (TaxBase jako number) a datum uskutečnění plnění (DateOfTaxableSupply, případně datum vystavení), čislo dokladu/vyúčtování/faktury (InvoiceNumber jako string),
 DIČ dodavatele (VatNumber jako string, nesmí být DIČ odběratele!).
-Bez jednotek hodnot, datum v iso formátu, preferuj číselné hodnoty co jsou nejblíže u sebe:
+Bez jednotek hodnot, datum v iso-8601 formátu, preferuj číselné hodnoty co jsou nejblíže u sebe:
 {pdfText}
 """
 
@@ -177,10 +177,10 @@ let main argv =
     use db = new LiteDatabase(@"FileName=/Users/janstrnad/OneDrive/Dokumenty/Faktury/TaxManagerDb/taxreturns.db;Connection=shared")
     let coll = db.GetCollection<InvoicePdf>("tax_return_invoices")
 
-    let pdfFilePath = "/Users/janstrnad/Library/CloudStorage/OneDrive-Personal/Dokumenty/Faktury/DPH 2022-1/"
+    let pdfFilePath = "/Users/janstrnad/Library/CloudStorage/OneDrive-Personal/Dokumenty/Faktury/DPH 2023-2/"
     let extracted =
         Directory.EnumerateDirectories(pdfFilePath, "Vstup", SearchOption.AllDirectories)
-        |> Seq.map (fun x -> Directory.EnumerateFiles(x, "Vodafone Vyúčtování číslo 826755915.pdf"))
+        |> Seq.map (fun x -> Directory.EnumerateFiles(x, "*.pdf"))
         |> Seq.concat
         |> Seq.map extractPdfInvoice
         |> Seq.fold (fun (o,e) x  ->
@@ -200,8 +200,18 @@ let main argv =
     //     |> ignore
 
     fst extracted
+        |> List.filter (fun x -> x.TaxBase < 10000m)
         |> List.fold (fun (t,v) x -> (x.TaxBase + t, x.Vat + v )) (0m,0m)
-        |> Printf.printfn "Total: %A"
+        |> Printf.printfn "Total under 10000CZK: %A"
+
+    fst extracted
+        |> List.filter (fun x -> x.TaxBase >= 10000m)
+        |> List.fold (fun (t,v) x -> (x.TaxBase + t, x.Vat + v )) (0m,0m)
+        |> Printf.printfn "Total over 10000CZK: %A"
+
+    fst extracted
+        |> List.fold (fun (t,v) x -> (x.TaxBase + t, x.Vat + v )) (0m,0m)
+        |> Printf.printfn "Grand Total: %A"
 
     snd extracted
         |> List.iter (fun x ->
