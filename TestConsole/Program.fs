@@ -102,8 +102,8 @@ type InvoicePdf =
 //todo musi byt mimo kod, push na github zrusi ten api key v openapi
 let [<Literal>]openAiKey = "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"
 
-let [<Literal>]deploymentId = "text-davinci-003"
-//let [<Literal>]deploymentId = "gpt-4"
+//let [<Literal>]deploymentId = "text-davinci-003"
+let [<Literal>]deploymentId = "gpt-4"
 
 let getPrompt pdfText = $"""
 Extrahuj ve formátu json (názvy propert v uvozovkách): daň respektive 'výše dph' (Vat jako number), daň %% (VatPercent jako number),
@@ -128,19 +128,19 @@ let extractPdfInvoice pdfFilePath =
     let prompt = getPrompt pdfText
     let prompt = prompt.Substring(0, Math.Min(prompt.Length, 4096))
     let openAiClient = OpenAIClient(openAiKey)
-    let options = CompletionsOptions()
-    options.Prompts.Add prompt
+    let options = ChatCompletionsOptions()
+    options.Messages.Add (ChatMessage(ChatRole.User, prompt))
     options.MaxTokens <- 250
     options.Temperature <- 0.5f
     options.FrequencyPenalty <- 0.0f
     options.PresencePenalty <- 0.0f
     options.NucleusSamplingFactor <- 1f
 
-    let resp = openAiClient.GetCompletions(deploymentId, options)
+    let resp = openAiClient.GetChatCompletions(deploymentId, options)
     printfn "Usage: %i" resp.Value.Usage.TotalTokens
 
     let resultStr = resp.Value.Choices
-                 |> Seq.map (fun x -> x.Text)
+                 |> Seq.map (fun x -> x.Message.Content)
                  |> Seq.head
 
 
