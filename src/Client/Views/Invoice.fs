@@ -395,7 +395,7 @@ let view =
                 ]
                 Field.div [ Field.IsGrouped ] [
                     Control.p [ Control.IsExpanded ] [
-                        Label.label [] [ str "Date od taxable supply" ]
+                        Label.label [] [ str "Date of taxable supply" ]
                         Flatpickr.flatpickr [ Flatpickr.OnChange(SetDateOfTaxableSupply >> dispatch)
                                               Flatpickr.Value(model.DateOfTaxableSupply)
                                               Flatpickr.DateFormat "d.m.Y"

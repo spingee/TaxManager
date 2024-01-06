@@ -177,7 +177,7 @@ let main argv =
     use db = new LiteDatabase(@"FileName=/Users/janstrnad/OneDrive/Dokumenty/Faktury/TaxManagerDb/taxreturns.db;Connection=shared")
     let coll = db.GetCollection<InvoicePdf>("tax_return_invoices")
 
-    let pdfFilePath = "/Users/janstrnad/Library/CloudStorage/OneDrive-Personal/Dokumenty/Faktury/DPH 2023-2/"
+    let pdfFilePath = "/Users/janstrnad/Library/CloudStorage/OneDrive-Personal/Dokumenty/Faktury/DPH 2023-4/"
     let extracted =
         Directory.EnumerateDirectories(pdfFilePath, "Vstup", SearchOption.AllDirectories)
         |> Seq.map (fun x -> Directory.EnumerateFiles(x, "*.pdf"))

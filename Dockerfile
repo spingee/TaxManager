@@ -1,12 +1,13 @@
-FROM mcr.microsoft.com/dotnet/sdk:7.0 as build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 as build
 
 #WORKDIR /workspace
 #COPY . .
 #ENTRYPOINT "/bin/sh"
 
 # Install node
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
-RUN apt-get update && apt-get install -y nodejs
+RUN apt update && apt install -y curl
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
+apt-get install -y nodejs
 
 WORKDIR /workspace
 COPY [".config/", "."]
@@ -41,7 +42,7 @@ RUN dotnet fable src/Client -o src/Client/output -s --run npm run build
 RUN cd src/Server && dotnet publish -c release -o ../../deploy
 
 
-FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 #install font for document converter
 RUN apt-get update \
 && apt-get install -y --allow-unauthenticated libc6-dev \
